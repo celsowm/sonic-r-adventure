@@ -15,6 +15,13 @@ typedef struct AdventureWallHit {
 bool AdventureCollision_SweepDiscSegment(AdventureVec3 from, AdventureVec3 to,
                                         AdventureVec3 a, AdventureVec3 b,
                                         int32_t radius, AdventureWallHit *out);
+/* Legacy .TER edge Y is negative-up; the adventure world is positive-up.
+ * Return true only when feet are above the interpolated top of a finite wall. */
+bool AdventureCollision_AboveLegacyWallTop(
+    int32_t foot_y, AdventureVec3 from, AdventureVec3 to,
+    AdventureVec3 edge_a, AdventureVec3 edge_b,
+    int16_t legacy_y_a, int16_t legacy_y_b, uint16_t impact_fraction);
+
 /* Resolve sliding with up to 3 sequential contacts, no heap allocations. */
 typedef bool (*AdventureWallQuery)(void *context, AdventureVec3 from,
                                      AdventureVec3 to, int32_t radius,

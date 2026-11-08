@@ -119,6 +119,47 @@ bool AdventureCollision_SweepDiscSegment(AdventureVec3 from, AdventureVec3 to,
     out->wall_id=-1;
     return true;
 }
+/*
+ * The original .TER wall top is an interpolated *negative* legacy Y value.
+ * On the adventure side it becomes positive-up. Using the signed legacy
+ * height directly would skip every gated wall on Resort Island (all 225
+ * gated-edge vertex heights observed in the supplied original TER are <= 0).
+ *
+ * Project the actual horizontal impact point onto the finite segment to
+ * avoid an endpoint-only height approximation on sloping wall tops.
+ */
+bool AdventureCollision_AboveLegacyWallTop(
+    int32_t foot_y, AdventureVec3 from, AdventureVec3 to,
+    AdventureVec3 edge_a, AdventureVec3 edge_b,
+    int16_t legacy_y_a, int16_t legacy_y_b, uint16_t impact_fraction)
+{
+    if (impact_fraction > ADV_FP_ONE) impact_fraction = ADV_FP_ONE;
+    int64_t px=(int64_t)from.x+
+        ((int64_t)to.x-from.x)*impact_fraction/ADV_FP_ONE;
+    int64_t pz=(int64_t)from.z+
+        ((int64_t)to.z-from.z)*impact_fraction/ADV_FP_ONE;
+
+    /* Q4 projection retains 1/16-unit precision while keeping
+     * (dot * 4096) within signed 64-bit bounds on native 16-bit TER vertices.
+     * Avoid __int128 and libm on Dreamcast SH-4. */
+    int64_t ax=(int64_t)edge_a.x/256;
+    int64_t az=(int64_t)edge_a.z/256;
+    int64_t dx=((int64_t)edge_b.x-edge_a.x)/256;
+    int64_t dz=((int64_t)edge_b.z-edge_a.z)/256;
+    int64_t wx=px/256-ax, wz=pz/256-az;
+    int64_t denom=dx*dx+dz*dz;
+    int64_t fraction=0;
+    if (denom>0) {
+        int64_t dot=wx*dx+wz*dz;
+        if (dot>=denom) fraction=ADV_FP_ONE;
+        else if (dot>0) fraction=dot*ADV_FP_ONE/denom;
+    }
+    int64_t legacy_top=(int64_t)legacy_y_a*ADV_FP_ONE+
+         ((int64_t)legacy_y_b-legacy_y_a)*fraction;
+    int64_t canonical_top=-legacy_top;
+    return (int64_t)foot_y>canonical_top;
+}
+
 void AdventureCollision_MoveAndSlide(AdventureVec3 *position,
                                     AdventureVec3 *horizontal_velocity,
                                     AdventureWallQuery query, void *context,

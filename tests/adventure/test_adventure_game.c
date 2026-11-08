@@ -346,6 +346,44 @@ static void test_wall_sliding(void)
     assert(position.x <= 10*ADV_FP_ONE && position.x >= 7*ADV_FP_ONE);
     assert(position.z <= 10*ADV_FP_ONE && position.z >= 7*ADV_FP_ONE);
 }
+/* Regression from real .TER height sign: gated wall vertex Y is
+ * negative-up, whereas Adventure uses positive-up. Gate top varies along
+ * the segment, so endpoint-only approximations produce false collisions. */
+static void test_legacy_wall_height_gate(void)
+{
+    AdventureVec3 a={10*ADV_FP_ONE,0,0};
+    AdventureVec3 b={10*ADV_FP_ONE,0,10*ADV_FP_ONE};
+    AdventureVec3 from={0,0,5*ADV_FP_ONE};
+    AdventureVec3 to={20*ADV_FP_ONE,0,5*ADV_FP_ONE};
+    AdventureWallHit hit;
+    assert(AdventureCollision_SweepDiscSegment(from,to,a,b,
+                                                ADV_FP_ONE,&hit));
+    /* Legacy edge heights -2 and -10 mean canonical top +2..+10.
+     * At the midpoint the actual wall top is +6 world units. */
+    assert(!AdventureCollision_AboveLegacyWallTop(
+        5*ADV_FP_ONE,from,to,a,b,-2,-10,hit.fraction));
+    assert(!AdventureCollision_AboveLegacyWallTop(
+        6*ADV_FP_ONE,from,to,a,b,-2,-10,hit.fraction));
+    assert(AdventureCollision_AboveLegacyWallTop(
+        7*ADV_FP_ONE,from,to,a,b,-2,-10,hit.fraction));
+    from.z=0;to.z=0;
+    assert(AdventureCollision_SweepDiscSegment(from,to,a,b,
+                                                ADV_FP_ONE,&hit));
+    assert(AdventureCollision_AboveLegacyWallTop(
+        3*ADV_FP_ONE,from,to,a,b,-2,-10,hit.fraction));
+    from.z=10*ADV_FP_ONE;to.z=10*ADV_FP_ONE;
+    assert(AdventureCollision_SweepDiscSegment(from,to,a,b,
+                                                ADV_FP_ONE,&hit));
+    assert(!AdventureCollision_AboveLegacyWallTop(
+        3*ADV_FP_ONE,from,to,a,b,-2,-10,hit.fraction));
+    /* Heights around -1,000 occur in the provided stage geometry and
+     * still fit signed Q20.12 without truncating. */
+    assert(!AdventureCollision_AboveLegacyWallTop(
+        999*ADV_FP_ONE,from,to,a,b,-1000,-1000,hit.fraction));
+    assert(AdventureCollision_AboveLegacyWallTop(
+        1001*ADV_FP_ONE,from,to,a,b,-1000,-1000,hit.fraction));
+}
+
 static void test_wall_gameplay(void)
 {
     AdventureGame game;
@@ -385,5 +423,6 @@ int main(void)
     test_segment_sweeps();
     test_wall_sliding();
     test_wall_gameplay();
+    test_legacy_wall_height_gate();
     return 0;
 }

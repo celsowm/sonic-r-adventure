@@ -66,18 +66,13 @@ static void scan_cell(int cellx,int cellz,
             if (((uint16_t)w->mask&layer_bit) &&
                 w->vtxBase>=0 && w->vtxCount>=2 &&
                 nearby(from,to,w,radius)) {
-                /* Each wall has one or more consecutive 6-byte vertices.
-                 * A capsule's feet and head can cross a finite height gate;
-                 * we conservatively ignore it only when feet are above both
-                 * endpoints. Non-gated walls remain unbounded vertically. */
+                /* Each wall has consecutive 6-byte vertices. For finite
+                 * height gates, compare canonical foot Y with the NEGATED
+                 * legacy vertex Y interpolated at the actual sweep impact.
+                 * Non-gated walls remain unbounded vertically. */
                 for (int seg=0;seg<(int)w->vtxCount-1;seg++) {
                     const TerVertex *v0=&vertices[w->vtxBase+seg];
                     const TerVertex *v1=&vertices[w->vtxBase+seg+1];
-                    if (w->heightGate) {
-                        int32_t max_h=v0->y>v1->y?v0->y:v1->y;
-                        int64_t feet=from.y<to.y?from.y:to.y;
-                        if (feet>=(int64_t)max_h*ADV_FP_ONE) continue;
-                    }
                     AdventureVec3 a={(int32_t)v0->x*ADV_FP_ONE,0,
                                      (int32_t)v0->z*ADV_FP_ONE};
                     AdventureVec3 b={(int32_t)v1->x*ADV_FP_ONE,0,
@@ -85,6 +80,11 @@ static void scan_cell(int cellx,int cellz,
                     AdventureWallHit h;
                     if (AdventureCollision_SweepDiscSegment(from,to,a,b,
                                                              radius,&h) &&
+                        (!w->heightGate ||
+                         !AdventureCollision_AboveLegacyWallTop(
+                             from.y < to.y ? from.y : to.y,
+                             from, to, a, b,
+                             v0->y, v1->y, h.fraction)) &&
                         (!*found || h.fraction<best->fraction)) {
                         h.wall_id=idx;
                         *best=h;
