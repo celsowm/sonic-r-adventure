@@ -1,5 +1,6 @@
 /* Pure C portable action-mode tests: no commercial assets, SDL or KOS. */
 #include "../../source/sdl/src/adventure/adventure_game.h"
+#include "../../source/sdl/src/adventure/adventure_vertical.h"
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
@@ -578,6 +579,150 @@ static void test_head_bonk_determinism(void)
     }
 }
 
+
+/* A thin platform crossed diagonally inside ONE fixed tick. The old
+ * final-X/Z-only floor and head checks returned no hit at x=10. */
+static bool thin_plane(void *context,int32_t x,int32_t z,int32_t threshold,
+                       AdventureGroundHit *out,bool ceiling)
+{
+    (void)context;
+    if (!out || x<5*ADV_FP_ONE || x>=5*ADV_FP_ONE+ADV_FP_ONE/2 ||
+        z<0 || z>=4*ADV_FP_ONE) return false;
+    int32_t h=ceiling?20*ADV_FP_ONE:10*ADV_FP_ONE;
+    if (ceiling ? h<threshold : h>threshold) return false;
+    out->height=h;
+    out->surface_id=42;
+    out->layer=2;
+    return true;
+}
+static bool thin_ground(void *ctx,int32_t x,int32_t z,int32_t lim,
+                        AdventureGroundHit *out)
+{
+    return thin_plane(ctx,x,z,lim,out,false);
+}
+static bool thin_roof(void *ctx,int32_t x,int32_t z,int32_t lim,
+                      AdventureGroundHit *out)
+{
+    return thin_plane(ctx,x,z,lim,out,true);
+}
+static void test_diagonal_terrain_sweeps(void)
+{
+    AdventureTerrain t={thin_ground,0,0,thin_roof};
+    AdventureVerticalContact c;
+    AdventureVec3 from={0,14*ADV_FP_ONE,ADV_FP_ONE};
+    AdventureVec3 to={10*ADV_FP_ONE,4*ADV_FP_ONE,ADV_FP_ONE};
+    assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,false,&c));
+    assert(c.surface.surface_id==42);
+    assert(c.position.x>=5*ADV_FP_ONE &&
+           c.position.x<5*ADV_FP_ONE+ADV_FP_ONE/2);
+    assert(c.position.y==10*ADV_FP_ONE);
+    assert(c.fraction<ADV_FP_ONE);
+    from.y=10*ADV_FP_ONE;
+    to.y=30*ADV_FP_ONE;
+    assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&c));
+    assert(c.surface.surface_id==42);
+    assert(c.position.y>15*ADV_FP_ONE &&
+           c.position.y<16*ADV_FP_ONE);
+    assert(c.position.x>=5*ADV_FP_ONE &&
+           c.position.x<5*ADV_FP_ONE+ADV_FP_ONE/2);
+    /* Querying only at final X/Z would return no floor or ceiling. */
+    AdventureGroundHit ignored;
+    assert(!thin_ground(0,to.x,to.z,to.y,&ignored));
+    assert(!thin_roof(0,to.x,to.z,to.y,&ignored));
+}
+static void test_diagonal_sweep_no_false_contact(void)
+{
+    AdventureTerrain t={thin_ground,0,0,thin_roof};
+    AdventureVerticalContact c;
+    AdventureVec3 from={0,14*ADV_FP_ONE,-2*ADV_FP_ONE};
+    AdventureVec3 to={10*ADV_FP_ONE,4*ADV_FP_ONE,-2*ADV_FP_ONE};
+    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,false,&c));
+    from.y=10*ADV_FP_ONE;
+    to.y=30*ADV_FP_ONE;
+    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&c));
+    /* A roof starting below an already elevated head is not an overhead
+     * contact: it should be blocked by side geometry, not snapped below. */
+    from.z=ADV_FP_ONE;to.z=ADV_FP_ONE;
+    from.y=18*ADV_FP_ONE;
+    to.y=32*ADV_FP_ONE;
+    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&c));
+}
+static void test_diagonal_sweep_replay(void)
+{
+    AdventureTerrain t={thin_ground,0,0,thin_roof};
+    AdventureVerticalContact a,b;
+    AdventureVec3 from={0,10*ADV_FP_ONE,ADV_FP_ONE};
+    AdventureVec3 to={10*ADV_FP_ONE,30*ADV_FP_ONE,ADV_FP_ONE};
+    for(int i=0;i<100;i++){
+        assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&a));
+        assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&b));
+        assert(a.position.x==b.position.x);
+        assert(a.position.y==b.position.y);
+        assert(a.position.z==b.position.z);
+        assert(a.fraction==b.fraction);
+    }
+}
+
+/* Full tick regression: Sonic starts outside a half-unit roof strip, passes
+ * through it mid-tick and finishes beyond it. Only a trajectory query can
+ * detect the head impact; the legacy endpoint query cannot. */
+static bool roof_strip_terrain(void *context,int32_t x,int32_t z,
+                               int32_t threshold,AdventureGroundHit *out,
+                               bool overhead)
+{
+    (void)context;
+    (void)z;
+    int32_t heights[2]={0,20*ADV_FP_ONE};
+    int count=(x>=5*ADV_FP_ONE &&
+               x<5*ADV_FP_ONE+ADV_FP_ONE/2)?2:1;
+    bool found=false;
+    int32_t best=0;
+    int idx=-1;
+    for(int i=0;i<count;i++){
+        int32_t h=heights[i];
+        if((overhead ? h>=threshold : h<=threshold) &&
+           (!found || (overhead ? h<best : h>best))){
+            found=true;best=h;idx=i;
+        }
+    }
+    if(found && out){
+        out->height=best;
+        out->surface_id=100+idx;
+        out->layer=1;
+    }
+    return found;
+}
+static bool roof_strip_ground(void *ctx,int32_t x,int32_t z,
+                              int32_t lim,AdventureGroundHit *out)
+{
+    return roof_strip_terrain(ctx,x,z,lim,out,false);
+}
+static bool roof_strip_overhead(void *ctx,int32_t x,int32_t z,
+                                int32_t lim,AdventureGroundHit *out)
+{
+    return roof_strip_terrain(ctx,x,z,lim,out,true);
+}
+static void test_game_tick_hits_narrow_roof(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain={roof_strip_ground,0,0,roof_strip_overhead};
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureVec3 spawn={4*ADV_FP_ONE+ADV_FP_ONE/2,
+                         15*ADV_FP_ONE,0};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(!game.player.grounded);
+    game.player.velocity.x=3*ADV_FP_ONE;
+    game.player.velocity.y=7*ADV_FP_ONE;
+    AdventureRawInput raw={0};
+    raw.move_y=32767;
+    assert(AdventureGame_Tick(&game,raw,kEast));
+    assert(game.player.pos.x>=5*ADV_FP_ONE);
+    assert(game.player.pos.x<5*ADV_FP_ONE+ADV_FP_ONE/2);
+    assert(game.player.pos.y<=16*ADV_FP_ONE);
+    assert(game.player.velocity.y==0);
+    assert(!game.player.grounded);
+}
 int main(void)
 {
     test_lifecycle();
@@ -599,5 +744,9 @@ int main(void)
     test_jump_from_upper_platform();
     test_unobstructed_jump_still_works();
     test_head_bonk_determinism();
+    test_diagonal_terrain_sweeps();
+    test_diagonal_sweep_no_false_contact();
+    test_diagonal_sweep_replay();
+    test_game_tick_hits_narrow_roof();
     return 0;
 }

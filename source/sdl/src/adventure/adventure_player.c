@@ -5,6 +5,7 @@
  * arbitrary mesh ceilings and special loop surfaces are not implemented.
  */
 #include "adventure_player.h"
+#include "adventure_vertical.h"
 #include <stdint.h>
 #define ADV_MAX_SPEED_Q12 (3 * ADV_FP_ONE)
 #define ADV_ACCEL_Q12 900
@@ -19,7 +20,6 @@
 #define ADV_JUMP_BUFFER_TICKS 6
 #define ADV_CAPSULE_RADIUS (ADV_FP_ONE)
 #define ADV_CAPSULE_HEIGHT (4 * ADV_FP_ONE)
-#define ADV_HEAD_CLEARANCE (ADV_FP_ONE / 64)
 
 void AdventurePlayer_Init(AdventurePlayer *p, AdventureVec3 pos, uint16_t facing)
 {
@@ -137,48 +137,36 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
     }
 
     if (!p->grounded) {
-        /* Gravity is integrated before displacement; stable 60Hz step. */
+        /* The horizontal wall solver already produced an X/Z displacement.
+         * Test feet or head over the WHOLE diagonal trajectory, not only at
+         * the last X/Z point (which missed thin elevated platforms). */
         p->velocity.y = AdventureMath_Approach(p->velocity.y, -ADV_TERMINAL,
-                                                ADV_GRAVITY);
-        int32_t old_y = p->pos.y;
-        int32_t new_y = AdventureMath_ClampI32((int64_t)old_y + p->velocity.y);
-        if (p->velocity.y > 0 && terrain.query_overhead) {
-            /* The .TER is a walkable-heightfield-like set of floor polygons.
-             * Regard the underside of an elevated floor as solid for Sonic's
-             * head, but NEVER mistake the player's own support as a ceiling.
-             * Query only the span crossed by the head THIS tick. */
-            int32_t old_head = AdventureMath_ClampI32(
-                (int64_t)old_y + ADV_CAPSULE_HEIGHT);
-            int32_t new_head = AdventureMath_ClampI32(
-                (int64_t)new_y + ADV_CAPSULE_HEIGHT);
-            AdventureGroundHit overhead;
-            if (terrain.query_overhead(terrain.context, p->pos.x, p->pos.z,
-                                       old_head, &overhead) &&
-                overhead.height <= new_head) {
-                int32_t limit = AdventureMath_ClampI32(
-                    (int64_t)overhead.height - ADV_CAPSULE_HEIGHT -
-                    ADV_HEAD_CLEARANCE);
-                /* Never lower the player when the head was already touching. */
-                new_y = limit > old_y ? limit : old_y;
-                p->velocity.y = 0;
+                                               ADV_GRAVITY);
+        AdventureVec3 from=p->previous_pos;
+        from.y=p->pos.y; /* freshly snapped support, if applicable */
+        AdventureVec3 to=p->pos;
+        to.y=AdventureMath_ClampI32((int64_t)from.y+p->velocity.y);
+        bool rising=p->velocity.y>0;
+        AdventureVerticalContact contact;
+        if (AdventureVertical_Sweep(terrain,from,to,ADV_CAPSULE_HEIGHT,
+                                     rising,&contact)) {
+            p->pos=contact.position;
+            /* Stop at the first intersecting footprint rather than skipping
+             * a narrow platform and drifting through its far side. */
+            p->velocity.x=AdventureMath_ClampI32(
+                (int64_t)p->pos.x-p->previous_pos.x);
+            p->velocity.z=AdventureMath_ClampI32(
+                (int64_t)p->pos.z-p->previous_pos.z);
+            p->velocity.y=0;
+            if (!rising) {
+                p->grounded=1;
+                p->surface_id=contact.surface.surface_id;
+                p->surface_layer=contact.surface.layer;
+                p->coyote_ticks=ADV_COYOTE_TICKS;
             }
+        }else{
+            p->pos.y=to.y;
         }
-        if (p->velocity.y <= 0) {
-            /* Swept downward foot interval: floor is accepted only when
-             * intersecting [new_y, old_y] at the new horizontal position.
-             * Avoid landing on floors ABOVE the old foot (stacked levels). */
-            AdventureGroundHit landing;
-            if (query(terrain, p->pos.x, p->pos.z, old_y, &landing) &&
-                landing.height >= new_y) {
-                new_y = landing.height;
-                p->velocity.y = 0;
-                p->grounded = 1;
-                p->surface_id = landing.surface_id;
-                p->surface_layer = landing.layer;
-                p->coyote_ticks = ADV_COYOTE_TICKS;
-            }
-        }
-        p->pos.y = new_y;
     }
     if (p->grounded) {
         p->motion = (p->velocity.x || p->velocity.z) ?

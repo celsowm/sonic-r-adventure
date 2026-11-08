@@ -1,6 +1,6 @@
 # WP-04: Vertical Physics and Terrain Support — First Integration
 
-**Status:** Floor, static-wall and elevated-platform underside collision integrated. Full 3D capsule/mesh collision coverage and real gameplay verification remain incomplete. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
+**Status:** Floor, static-wall and elevated-platform underside collision integrated. Full 3D capsule/mesh collision coverage and real gameplay verification remain incomplete. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), [diagonal sweeps and visual BIN audit](WP04_DIAGONAL_SWEEP_AND_BIN_AUDIT.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
 
 ## Implemented
 
@@ -9,7 +9,7 @@
 - Support lookup filters candidates to those below the maximum step-up height; selection chooses the highest qualifying floor, so a lower bridge surface does not teleport a player onto an overhead platform.
 - Player ground/support state lives in `AdventurePlayer`, not in the rigid legacy `Player` ABI. Only the rendering bridge transfers position, velocity, animation-facing and support-related presentation fields.
 - Fixed 60-Hz gravity, terminal velocity, rising/falling state, jump impulse, *coyote time*, input edge detection and short buffered jump.
-- A downward foot-crossing test checks whether a falling player's previous-to-next vertical position crosses an eligible supporting floor, preventing simple vertical tunneling through narrow platforms.
+- A bounded, sampled 3D trajectory sweep for the head/feet checks intermediate X/Z positions during a fixed tick and refines the first floor/underside contact; this avoids skipping many narrow platforms during a diagonal jump. It is **not** an analytic full-capsule/triangle sweep.
 - Spawn snapping and grounded ramp movement, within limited step-height and snap thresholds.
 - Asset-free synthetic fixture tests for a valid ground at height zero, ramp, upper/lower stacked surfaces, ledge coyote jump, jump/landing and deterministic replay.
 
@@ -19,7 +19,7 @@ This is deliberately **not** the full collision solution specified in the master
 
 - **Partial collision only:** Static .TER walls now have horizontal swept-disc contacts and elevated floor polygons block upward head movement, but arbitrary scenery roofs, full 3D swept capsules and moving platforms can still be passed through.
 - **Special meshes excluded:** loop/ride surfaces, special dynamic geometry, moving platforms and destructible items still need explicit collision providers.
-- **Sweeps are incomplete:** Horizontal static-wall sweeps are bounded/substepped and upward/downward floor checks are sampled at the resolved X/Z coordinate; true full-3D sweeps are still needed for diagonal impacts and thin dynamic geometry.
+- **Sweeps are incomplete:** Horizontal static-wall sweeps and sampled diagonal foot/head checks are in place, but exact 3D capsule/triangle TOI, radial floor-edge contacts and thin dynamic geometry are not yet solved.
 - **No slope normals:** ramp elevation follows `.TER` geometry but slope-dependent friction, walkability thresholds and steep-slope sliding are not yet implemented.
 - **No respawn checkpoint or death plane:** falling off the stage currently has no recoverable action-state exit.
 - **No gameplay animation mapping:** jump and fall phases have pure simulation states but render animation still needs integration.
