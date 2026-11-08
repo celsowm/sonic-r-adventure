@@ -33,6 +33,18 @@ static void test_coordinates(void)
     assert(x == 12345 && y == -8192 && z == -54321);
     assert(AdventureMath_ClampI32((int64_t)INT32_MAX + 1) == INT32_MAX);
     assert(AdventureMath_ClampI32((int64_t)INT32_MIN - 1) == INT32_MIN);
+    int32_t cell=-1;
+    assert(AdventureMath_GridCell(-10*ADV_FP_ONE,-10,5,32,&cell));
+    assert(cell==0);
+    /* Fractional Q12 coordinate just OUTSIDE a negative world origin. */
+    assert(!AdventureMath_GridCell(-10*ADV_FP_ONE-1,-10,5,32,&cell));
+    assert(AdventureMath_GridCell(-5*ADV_FP_ONE-1,-10,5,32,&cell));
+    assert(cell==0);
+    assert(AdventureMath_GridCell(-5*ADV_FP_ONE,-10,5,32,&cell));
+    assert(cell==1);
+    assert(!AdventureMath_GridCell(150*ADV_FP_ONE,-10,5,32,&cell));
+    assert(!AdventureMath_GridCell(0,-10,0,32,&cell));
+    assert(!AdventureMath_GridCell(0,-10,5,32,0));
     p = AdventureMath_FromLegacy(0, INT32_MIN, 0);
     assert(p.y == INT32_MAX); /* saturate, never signed overflow */
     AdventureBasis east = AdventureMath_CameraBasis(0, 0, -10 * ADV_FP_ONE, 0);

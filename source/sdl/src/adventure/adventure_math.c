@@ -48,6 +48,18 @@ void AdventureMath_ToLegacy(AdventureVec3 v, int32_t *x, int32_t *y, int32_t *z)
     if (y) *y = AdventureMath_ClampI32(-(int64_t)v.y);
     if (z) *z = v.z;
 }
+bool AdventureMath_GridCell(int32_t coordinate, int32_t origin_world,
+                            int32_t span_world, int32_t count, int32_t *cell)
+{
+    if (!cell || span_world <= 0 || count <= 0) return false;
+    int64_t offset = (int64_t)coordinate - (int64_t)origin_world * ADV_FP_ONE;
+    if (offset < 0) return false;
+    int64_t index = offset / ((int64_t)span_world * ADV_FP_ONE);
+    if (index >= count) return false;
+    *cell = (int32_t)index;
+    return true;
+}
+
 int32_t AdventureMath_Approach(int32_t value, int32_t target, int32_t delta)
 {
     if (delta < 0) delta = 0;

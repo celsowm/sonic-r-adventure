@@ -30,15 +30,11 @@ static bool query_ter_height(int32_t x, int32_t z, int32_t threshold,
         !g_terFaceTable || !g_terVertexTable ||
         g_aiGridCellWidth <= 0 || g_aiGridCellHeight <= 0) return false;
 
-    /* Compute offsets in Q20.12 BEFORE division. C truncates negative
-     * division toward zero, so pre-shifting the coordinate could wrongly
-     * admit a point one fractional unit outside cell zero. */
-    int64_t grid_x = (int64_t)x - (int64_t)g_aiGridOriginX * ADV_FP_ONE;
-    int64_t grid_z = (int64_t)z - (int64_t)g_aiGridOriginZ * ADV_FP_ONE;
-    if (grid_x < 0 || grid_z < 0) return false;
-    int64_t cell_x = grid_x / ((int64_t)g_aiGridCellWidth * ADV_FP_ONE);
-    int64_t cell_z = grid_z / ((int64_t)g_aiGridCellHeight * ADV_FP_ONE);
-    if (cell_x >= 32 || cell_z >= 32) return false;
+    int32_t cell_x, cell_z;
+    if (!AdventureMath_GridCell(x, g_aiGridOriginX, g_aiGridCellWidth,
+                                32, &cell_x) ||
+        !AdventureMath_GridCell(z, g_aiGridOriginZ, g_aiGridCellHeight,
+                                32, &cell_z)) return false;
     const int16_t *grid = (const int16_t *)g_terGridIndex;
     int16_t offset = grid[cell_z * 32 + cell_x];
     if (offset < 0) return false;

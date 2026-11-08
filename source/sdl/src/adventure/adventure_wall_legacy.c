@@ -14,13 +14,6 @@
 #define ADV_LEGACY_WALLS 4096
 #define ADV_LEGACY_MAX_SCAN_STEPS 32
 
-static int32_t sample_cell(int32_t world, int32_t origin, int32_t span)
-{
-    int64_t diff=(int64_t)world / ADV_FP_ONE - origin;
-    if (diff<0 || span<=0) return -1;
-    int64_t cell=diff/span;
-    return cell>=ADV_LEGACY_GRID ? -1 : (int32_t)cell;
-}
 static bool nearby(AdventureVec3 from, AdventureVec3 to,
                    const TerCollisionMesh *w, int32_t radius)
 {
@@ -129,9 +122,12 @@ bool AdventureTerrain_SweepLegacyWall(void *context,AdventureVec3 from,
                   ((int64_t)to.x-from.x)*step/steps;
         int64_t z=(int64_t)from.z+
                   ((int64_t)to.z-from.z)*step/steps;
-        int cellx=sample_cell((int32_t)x,g_aiGridOriginX,g_aiGridCellWidth);
-        int cellz=sample_cell((int32_t)z,g_aiGridOriginZ,g_aiGridCellHeight);
-        if (cellx<0||cellz<0) continue;
+        int32_t cellx, cellz;
+        if (!AdventureMath_GridCell((int32_t)x,g_aiGridOriginX,
+                                     g_aiGridCellWidth,ADV_LEGACY_GRID,&cellx) ||
+            !AdventureMath_GridCell((int32_t)z,g_aiGridOriginZ,
+                                     g_aiGridCellHeight,ADV_LEGACY_GRID,&cellz))
+            continue;
         for (int dz=-1;dz<=1;dz++)
             for (int dx=-1;dx<=1;dx++)
                 scan_cell(cellx+dx,cellz+dz,from,to,radius,layer,
