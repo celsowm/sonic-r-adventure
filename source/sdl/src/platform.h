@@ -83,6 +83,12 @@ int platform_init_gamepads(void);
  * Unused slots are zeroed. Returns number of gamepads found. */
 int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots);
 
+/* WP-02 action input: physical controls, independent of race remapping.
+ * Raw values are sampled once per render frame then normalized per sim tick.
+ * Forward declaration keeps this interface SDL/KOS-agnostic. */
+struct AdventureRawInput;
+void platform_adventure_read_input(struct AdventureRawInput *out);
+
 /* =====================================================================
  * Timing
  * ===================================================================== */

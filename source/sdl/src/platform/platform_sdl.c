@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "platform.h"
+#include "adventure/adventure_input.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -698,6 +699,73 @@ static int gamepad_button_held(const GamepadSlot *pad, int b)
                    (SDL_GameControllerButton)b) != 0;
     }
     return SDL_JoystickGetButton(pad->joy, b) != 0;
+}
+
+/* Action controls bypass the original digital-only racing input and bindings.
+ * SDL supplies full-precision analog on mapped controllers, keyboard fallback
+ * works in parallel. No joystick or key state is modified by this reader. */
+void platform_adventure_read_input(struct AdventureRawInput *out)
+{
+    if (!out) return;
+    memset(out, 0, sizeof(*out));
+    if (s_padCount > 0) {
+        const GamepadSlot *pad = &s_pads[0];
+        if (pad->ctrl) {
+            int ly = SDL_GameControllerGetAxis(pad->ctrl, SDL_CONTROLLER_AXIS_LEFTY);
+            out->move_x = SDL_GameControllerGetAxis(pad->ctrl, SDL_CONTROLLER_AXIS_LEFTX);
+            out->move_y = (int16_t)(ly == -32768 ? 32767 : -ly);
+            if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT))
+                out->move_x = -32767;
+            if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT))
+                out->move_x = 32767;
+            if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_DPAD_UP))
+                out->move_y = 32767;
+            if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_DPAD_DOWN))
+                out->move_y = -32767;
+            if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_A))
+                out->buttons |= ADV_ACTION_JUMP;
+            if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_B))
+                out->buttons |= ADV_ACTION_ROLL;
+            if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_LEFTSHOULDER))
+                out->buttons |= ADV_ACTION_CAMERA_LEFT;
+            if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))
+                out->buttons |= ADV_ACTION_CAMERA_RIGHT;
+        } else if (pad->joy) {
+            if (SDL_JoystickNumAxes(pad->joy) >= 2) {
+                int ly = SDL_JoystickGetAxis(pad->joy, 1);
+                out->move_x = SDL_JoystickGetAxis(pad->joy, 0);
+                out->move_y = (int16_t)(ly == -32768 ? 32767 : -ly);
+            }
+            if (SDL_JoystickNumHats(pad->joy) > 0) {
+                Uint8 h = SDL_JoystickGetHat(pad->joy, 0);
+                if (h & SDL_HAT_LEFT) out->move_x = -32767;
+                if (h & SDL_HAT_RIGHT) out->move_x = 32767;
+                if (h & SDL_HAT_UP) out->move_y = 32767;
+                if (h & SDL_HAT_DOWN) out->move_y = -32767;
+            }
+            if (SDL_JoystickNumButtons(pad->joy) > 0 &&
+                SDL_JoystickGetButton(pad->joy, 0))
+                out->buttons |= ADV_ACTION_JUMP;
+            if (SDL_JoystickNumButtons(pad->joy) > 1 &&
+                SDL_JoystickGetButton(pad->joy, 1))
+                out->buttons |= ADV_ACTION_ROLL;
+        }
+    }
+    const Uint8 *keys = SDL_GetKeyboardState(NULL);
+    int left = keys[SDL_SCANCODE_A] || keys[SDL_SCANCODE_LEFT];
+    int right = keys[SDL_SCANCODE_D] || keys[SDL_SCANCODE_RIGHT];
+    int up = keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP];
+    int down = keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN];
+    /* Keyboard movement takes priority over a drifting idle gamepad. */
+    if (left || right || up || down) {
+        out->move_x = (int16_t)((right - left) * 32767);
+        out->move_y = (int16_t)((up - down) * 32767);
+    }
+    if (keys[SDL_SCANCODE_SPACE]) out->buttons |= ADV_ACTION_JUMP;
+    if (keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL])
+        out->buttons |= ADV_ACTION_ROLL;
+    if (keys[SDL_SCANCODE_Q]) out->buttons |= ADV_ACTION_CAMERA_LEFT;
+    if (keys[SDL_SCANCODE_E]) out->buttons |= ADV_ACTION_CAMERA_RIGHT;
 }
 
 int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)

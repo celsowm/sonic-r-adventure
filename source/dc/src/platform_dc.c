@@ -38,6 +38,7 @@ KOS_INIT_FLAGS(INIT_DEFAULT | INIT_NET);
 #include <arch/timer.h>
 
 #include "platform.h"
+#include "adventure/adventure_input.h"
 #include "pad_bits.h"   /* PAD_LEFT / PAD_UP / ... for the pad poller */
 #include "sonicr_paths.h"   /* PATH_GENERAL_RAW for the slow-media probe */
 
@@ -676,6 +677,52 @@ unsigned int platform_menu_buttons(void)
         if (cs->buttons & CONT_DPAD_RIGHT) m |= MENUBTN_RIGHT;
     }
     return m;
+}
+
+/* Raw Maple movement for adventure mode; do not degrade analog into race
+ * steering bits, and do not modify the legacy input remapping arrays. */
+void platform_adventure_read_input(struct AdventureRawInput *out)
+{
+    if (!out) return;
+    memset(out, 0, sizeof(*out));
+    maple_device_t *dev = NULL;
+    for (int port = 0; port < MAX_GAMEPADS; ++port) {
+        dev = maple_enum_type(port, MAPLE_FUNC_CONTROLLER);
+        if (dev) break;
+    }
+    if (dev) {
+        cont_state_t *cs = (cont_state_t *)maple_dev_status(dev);
+        if (cs) {
+            /* Maple signed analog range: -128..127, up is negative Y. */
+            int32_t x = (int32_t)cs->joyx * 256;
+            int32_t y = -(int32_t)cs->joyy * 256;
+            if (y > 32767) y = 32767;
+            out->move_x = (int16_t)x;
+            out->move_y = (int16_t)y;
+            if (cs->buttons & CONT_DPAD_LEFT) out->move_x = -32767;
+            if (cs->buttons & CONT_DPAD_RIGHT) out->move_x = 32767;
+            if (cs->buttons & CONT_DPAD_UP) out->move_y = 32767;
+            if (cs->buttons & CONT_DPAD_DOWN) out->move_y = -32767;
+            if (cs->buttons & CONT_A) out->buttons |= ADV_ACTION_JUMP;
+            if (cs->buttons & CONT_B) out->buttons |= ADV_ACTION_ROLL;
+            if (cs->ltrig > DC_TRIGGER_THRESH)
+                out->buttons |= ADV_ACTION_CAMERA_LEFT;
+            if (cs->rtrig > DC_TRIGGER_THRESH)
+                out->buttons |= ADV_ACTION_CAMERA_RIGHT;
+        }
+    }
+    int left = !!(s_keystate[DIK_A] & 0x80) || !!(s_keystate[DIK_LEFT] & 0x80);
+    int right = !!(s_keystate[DIK_D] & 0x80) || !!(s_keystate[DIK_RIGHT] & 0x80);
+    int up = !!(s_keystate[DIK_W] & 0x80) || !!(s_keystate[DIK_UP] & 0x80);
+    int down = !!(s_keystate[DIK_S] & 0x80) || !!(s_keystate[DIK_DOWN] & 0x80);
+    if (left || right || up || down) {
+        out->move_x = (int16_t)((right-left) * 32767);
+        out->move_y = (int16_t)((up-down) * 32767);
+    }
+    if (s_keystate[DIK_SPACE] & 0x80) out->buttons |= ADV_ACTION_JUMP;
+    if (s_keystate[DIK_LCONTROL] & 0x80) out->buttons |= ADV_ACTION_ROLL;
+    if (s_keystate[DIK_Q] & 0x80) out->buttons |= ADV_ACTION_CAMERA_LEFT;
+    if (s_keystate[DIK_E] & 0x80) out->buttons |= ADV_ACTION_CAMERA_RIGHT;
 }
 
 int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)

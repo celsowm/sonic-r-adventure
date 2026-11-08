@@ -1,28 +1,23 @@
-/*
- * Sonic R Adventure -- portable gameplay lifecycle (WP-01 skeleton).
- * No SDL, KOS, renderer or legacy racing types are allowed in this header.
- */
+/* Sonic R Adventure -- platform-independent fixed-tick gameplay state. */
 #ifndef SONICR_ADVENTURE_GAME_H
 #define SONICR_ADVENTURE_GAME_H
-
+#include "adventure_input.h"
+#include "adventure_player.h"
 #include <stdbool.h>
 #include <stdint.h>
-
 typedef enum AdventurePhase {
     ADVENTURE_PHASE_UNINITIALIZED = 0,
-    ADVENTURE_PHASE_RUNNING,
-    ADVENTURE_PHASE_STOPPED
+    ADVENTURE_PHASE_RUNNING, ADVENTURE_PHASE_STOPPED
 } AdventurePhase;
-
 typedef struct AdventureGame {
     AdventurePhase phase;
     uint32_t tick_count;
+    AdventureInputHistory input_history;
+    AdventurePlayer player;
 } AdventureGame;
-
-/* Stage simulation is deliberately a no-op until the controller (WP-02/03).
- * No original racing update is called from these functions. */
 void AdventureGame_Init(AdventureGame *game);
-bool AdventureGame_Tick(AdventureGame *game);
+void AdventureGame_SetSpawn(AdventureGame *game, AdventureVec3 pos, uint16_t facing);
+/* Returns false after shutdown. raw controls are sampled once per fixed tick. */
+bool AdventureGame_Tick(AdventureGame *game, AdventureRawInput raw, AdventureBasis camera_basis);
 void AdventureGame_Shutdown(AdventureGame *game);
-
-#endif /* SONICR_ADVENTURE_GAME_H */
+#endif

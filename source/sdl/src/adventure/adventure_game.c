@@ -1,28 +1,30 @@
-/*
- * Platform-independent adventure-mode update lifecycle.
- * This intentionally does not simulate Sonic yet: WP-01 isolates the mode,
- * stage render path, and update schedule before introducing new physics.
- */
+/* Own the authoritative tick and player state; never call racing physics. */
 #include "adventure_game.h"
-
 void AdventureGame_Init(AdventureGame *game)
 {
-    if (game == 0) return;
-    game->tick_count = 0;
+    if (!game) return;
     game->phase = ADVENTURE_PHASE_RUNNING;
+    game->tick_count = 0;
+    AdventureInput_Reset(&game->input_history);
+    AdventureVec3 origin = {0, 0, 0};
+    AdventurePlayer_Init(&game->player, origin, 0);
 }
-
-bool AdventureGame_Tick(AdventureGame *game)
+void AdventureGame_SetSpawn(AdventureGame *game, AdventureVec3 pos, uint16_t facing)
 {
-    if (game == 0 || game->phase != ADVENTURE_PHASE_RUNNING)
-        return false;
-
+    if (!game || game->phase != ADVENTURE_PHASE_RUNNING) return;
+    AdventurePlayer_Init(&game->player, pos, facing);
+    AdventureInput_Reset(&game->input_history);
+}
+bool AdventureGame_Tick(AdventureGame *game, AdventureRawInput raw, AdventureBasis camera_basis)
+{
+    if (!game || game->phase != ADVENTURE_PHASE_RUNNING) return false;
+    AdventureInput input = AdventureInput_Sample(&game->input_history, raw);
+    AdventurePlayer_TickGroundPilot(&game->player, input, camera_basis);
     ++game->tick_count;
     return true;
 }
-
 void AdventureGame_Shutdown(AdventureGame *game)
 {
-    if (game == 0) return;
+    if (!game) return;
     game->phase = ADVENTURE_PHASE_STOPPED;
 }

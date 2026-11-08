@@ -6,11 +6,13 @@
  * some race/AI data, however NO race physics, lap/rank updates, replay,
  * rubber-banding, or race-result handling is executed by this loop.
  *
- * The player is intentionally stationary until the controller WP-02/03.
- * This is a stage/render/lifecycle proof, not a playable action stage yet.
+ * WP-02/03 adds a deterministic horizontal motion pilot and continuous input.
+ * Y is held at the loaded spawn height until WP-04 terrain support/sweeps.
+ * This deliberately is not yet a safely navigable 3D platforming stage.
  */
 #include "adventure_mode.h"
 #include "adventure_game.h"
+#include "adventure_math.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
@@ -24,6 +26,22 @@ extern void FlipD3D(void);
 extern unsigned char s_keystate[256];
 
 static int s_adventure_active;
+
+/* One-way bridge into exactly the legacy fields consumed by presentation.
+ * Never run UpdatePlayerMovement or the five-player race physics scheduler. */
+static void AdventureMode_ApplyPlayer(const AdventurePlayer *state)
+{
+    Player *render = &g_playerBase[0];
+    AdventureMath_ToLegacy(state->previous_pos, &render->prevPosX,
+                           &render->prevPosY, &render->prevPosZ);
+    AdventureMath_ToLegacy(state->pos, &render->posX,
+                           &render->posY, &render->posZ);
+    render->velX = state->velocity.x;
+    render->velY = AdventureMath_ClampI32(-(int64_t)state->velocity.y);
+    render->velZ = state->velocity.z;
+    render->angleYaw = (int)state->facing;
+    render->moveMode = (short)state->facing;
+}
 
 int AdventureMode_IsActive(void)
 {
@@ -43,6 +61,11 @@ int AdventureMode_RunPreview(void)
     g_playerBase[0].charId = CHAR_SONIC;
     g_playerBase[0].renderEnabled = 1;
     g_playerBase[0].moveMode = (short)(g_playerBase[0].angleYaw & 0x0fff);
+    AdventureGame_SetSpawn(&game,
+        AdventureMath_FromLegacy(g_playerBase[0].posX,
+                                 g_playerBase[0].posY,
+                                 g_playerBase[0].posZ),
+        (uint16_t)g_playerBase[0].angleYaw);
 
     /* Do not enter the original pre-race countdown/iris. */
     g_introCountdown = 0;
@@ -80,6 +103,9 @@ int AdventureMode_RunPreview(void)
 #endif
         if (quit_requested) break;
 
+        AdventureRawInput controls;
+        platform_adventure_read_input(&controls);
+
         /* 60 fixed ticks/second without floating point or render-time input.
          * Bounded catch-up avoids a spiral when the renderer is overloaded.
          * Future movement ticks will use a normalized input snapshot. */
@@ -89,14 +115,27 @@ int AdventureMode_RunPreview(void)
         tick_accum += elapsed_ms * 60u;
         unsigned int ticks = 0;
         while (tick_accum >= 1000u && ticks < 4u) {
-            (void)AdventureGame_Tick(&game);
+            /* Camera coordinates use 1/16 world units, player uses Q20.12.
+             * Derive the movement reference from camera position, not from
+             * ambiguously named legacy targetYaw/targetPitch fields. */
+            int32_t cam_x = AdventureMath_ClampI32(
+                (int64_t)g_camStateTable[0].posX * 256);
+            int32_t cam_z = AdventureMath_ClampI32(
+                (int64_t)g_camStateTable[0].posZ * 256);
+            AdventureBasis basis = AdventureMath_CameraBasis(
+                game.player.pos.x, game.player.pos.z, cam_x, cam_z);
+            (void)AdventureGame_Tick(&game, controls, basis);
             tick_accum -= 1000u;
             ++ticks;
         }
         if (tick_accum >= 1000u) tick_accum = 0;
 
         g_currentTime = frame_start_ms;
+        AdventureMode_ApplyPlayer(&game.player);
         g_playerBase[0].renderEnabled = 1;
+        /* Temporary chase camera is updated after position integration.
+         * WP-05 replaces this renderer-facing compatibility bridge. */
+        BuildChaseCamera(&g_playerBase[0], &g_camStateTable[0]);
         BuildCameraViewForViewport(0);
         RenderHUD();
         FlipD3D();
