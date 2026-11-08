@@ -8,7 +8,7 @@
 - The body is represented by a vertical capsule **footprint** of one world unit radius and four units height. The height of the capsule is reserved in the provider API; only horizontal sweeps are implemented in this increment.
 - `AdventureCollision_MoveAndSlide` resolves up to three consecutive contacts per 60-Hz simulation tick, stops at the nearest obstacle, adds a separation skin, then projects the remaining displacement along the wall tangent.
 - `AdventureTerrain_SweepLegacyWall` reads the native .TER grid, `TerCollisionMesh` mask/layer, center/radius broad phase and `g_terEdgeList` wall segments.
-- A 4096-bit per-query visited set prevents duplicate wall processing across grid cells. The adapter samples the grid along the attempted path with neighbouring cells for cell-boundary collisions.
+- A 4096-bit per-query visited set prevents duplicate wall processing, while a separate 1024-bit visited-cell mask prevents rescanning grid entries. Sweep sampling adapts to half the local grid-cell span and checks adjacent cells for boundary collisions.
 - Finite-height wall gates are conservatively ignored only when the player's feet are above both endpoint heights. Walls without gates are treated as vertically unbounded.
 - All wall collision queries are **read-only**. In particular, the legacy `WallCollision`, `WallBounce`, `WallPushback` and soft-wall mask mutation paths are never invoked.
 - The normalized input, vertical terrain support, coyote jumping and original chase-camera preview remain separate from the racing simulation.

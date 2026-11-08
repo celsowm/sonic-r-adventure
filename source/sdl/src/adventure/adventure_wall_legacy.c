@@ -12,7 +12,7 @@
 #include <string.h>
 #define ADV_LEGACY_GRID 32
 #define ADV_LEGACY_WALLS 4096
-#define ADV_LEGACY_SCAN_STEPS 16
+#define ADV_LEGACY_MAX_SCAN_STEPS 32
 
 static int32_t sample_cell(int32_t world, int32_t origin, int32_t span)
 {
@@ -40,13 +40,16 @@ static bool nearby(AdventureVec3 from, AdventureVec3 to,
 static void scan_cell(int cellx,int cellz,
                       AdventureVec3 from,AdventureVec3 to,
                       int32_t radius,int32_t layer,
-                      unsigned char *visited,
+                      unsigned char *visited, unsigned char *visited_cells,
                       AdventureWallHit *best,bool *found)
 {
     if (cellx<0 || cellx>=ADV_LEGACY_GRID ||
         cellz<0 || cellz>=ADV_LEGACY_GRID) return;
+    int cell_index=cellz*ADV_LEGACY_GRID+cellx;
+    if (visited_cells[cell_index>>3] & (1u<<(cell_index&7))) return;
+    visited_cells[cell_index>>3] |= (unsigned char)(1u<<(cell_index&7));
     const int16_t *grid=(const int16_t *)g_terGridIndex;
-    int index=grid[cellz*ADV_LEGACY_GRID+cellx];
+    int index=grid[cell_index];
     if (index<0) return;
     const uint16_t *entries=(const uint16_t *)g_terGridData+index;
     const TerCollisionMesh *walls=(const TerCollisionMesh *)g_terCollisionMesh;
@@ -104,23 +107,35 @@ bool AdventureTerrain_SweepLegacyWall(void *context,AdventureVec3 from,
         !g_terEdgeList || g_aiGridCellWidth<=0 || g_aiGridCellHeight<=0 ||
         layer<0 || layer>=16 || radius<=0) return false;
     unsigned char visited[ADV_LEGACY_WALLS/8];
+    unsigned char visited_cells[(ADV_LEGACY_GRID*ADV_LEGACY_GRID)/8];
     memset(visited,0,sizeof(visited));
+    memset(visited_cells,0,sizeof(visited_cells));
     bool found=false;
     AdventureWallHit best={0};
-    /* Visit grid cells along the sweep (up to 16 cells), including their
-     * immediate neighbours to handle discs straddling cell boundaries. */
-    for (int step=0;step<=ADV_LEGACY_SCAN_STEPS;step++) {
+    /* Sample no farther than half a grid cell between probes. On normal
+     * 3-world-unit movement this is usually just one segment; no repeated
+     * cell-list scans within a query. */
+    int32_t span=g_aiGridCellWidth<g_aiGridCellHeight?
+                 g_aiGridCellWidth:g_aiGridCellHeight;
+    uint32_t step_q8=(uint32_t)span*128u;
+    if (step_q8<32u) step_q8=32u;
+    int64_t dx=((int64_t)to.x-from.x)/16;
+    int64_t dz=((int64_t)to.z-from.z)/16;
+    uint32_t movement=AdventureMath_IsqrtU64((uint64_t)(dx*dx+dz*dz));
+    uint32_t steps=movement/step_q8+1;
+    if (steps>ADV_LEGACY_MAX_SCAN_STEPS) steps=ADV_LEGACY_MAX_SCAN_STEPS;
+    for (uint32_t step=0;step<=steps;step++) {
         int64_t x=(int64_t)from.x+
-                  ((int64_t)to.x-from.x)*step/ADV_LEGACY_SCAN_STEPS;
+                  ((int64_t)to.x-from.x)*step/steps;
         int64_t z=(int64_t)from.z+
-                  ((int64_t)to.z-from.z)*step/ADV_LEGACY_SCAN_STEPS;
+                  ((int64_t)to.z-from.z)*step/steps;
         int cellx=sample_cell((int32_t)x,g_aiGridOriginX,g_aiGridCellWidth);
         int cellz=sample_cell((int32_t)z,g_aiGridOriginZ,g_aiGridCellHeight);
         if (cellx<0||cellz<0) continue;
         for (int dz=-1;dz<=1;dz++)
             for (int dx=-1;dx<=1;dx++)
                 scan_cell(cellx+dx,cellz+dz,from,to,radius,layer,
-                          visited,&best,&found);
+                          visited,visited_cells,&best,&found);
     }
     if (found) *out=best;
     return found;
