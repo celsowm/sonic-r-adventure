@@ -14,6 +14,7 @@
 #include "r_state.h"
 #include "r_draw.h"
 #include "nearclip.h"   /* g_scissorEdge + ScissorEdge enum */
+#include "adventure/adventure_mode.h"
 #ifdef SONICR_DC
 extern void R_SetTileClip(int sx, int sy, int ex, int ey);
 extern void R_SetTileClipFullScreen(void);
@@ -21,6 +22,10 @@ extern void Pad448_Draw(void);   /* dc/src/pad448.c */
 #endif
 #include <string.h>
 #include <math.h>
+
+/* Pixel-font debug overlay, drawn inside the active render frame. */
+extern void DrawDebugOverlayText(const char *text, int x, int y,
+                                 int pixelSize, unsigned int color);
 
 /* Digit sprite UV layout on g_tpageParallax1:
  *   Large digits: (digit*8 + baseX, 0x88), size 8×16 each
@@ -639,7 +644,7 @@ void RenderHUD(void)
             }
         }
 
-        if (g_demoMode == DEMO_NONE) {
+        if (g_demoMode == DEMO_NONE && !AdventureMode_IsActive()) {
             int hudPlayerIdx = (g_isNetworkGame != 0) ? g_localPlayerIndex : (int)vp;
             DrawTimerAndStatus(hudPlayerIdx);
         }
@@ -746,6 +751,13 @@ void RenderHUD(void)
     }
 
     DrawPauseOverlay();
+
+    if (AdventureMode_IsActive()) {
+        DrawDebugOverlayText("SONIC R ADVENTURE - BOOT PREVIEW",
+                             14, 16, 2, 0xFFFFFFFFu);
+        DrawDebugOverlayText("CONTROLLER NOT IMPLEMENTED - ESC / START TO EXIT",
+                             14, 36, 1, 0xFFFFFFFFu);
+    }
 
     /* Fade iris — 0x4cd48e: cmp [0x901c44], 0 / jge */
     if (g_fadeLevel < 0) {

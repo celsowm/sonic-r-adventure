@@ -67,6 +67,14 @@ else
 endif
 
 
+# Optional action-mode boot. Run 'make clean' when toggling flags.
+ADVENTURE_BOOT ?= 0
+ifeq ($(ADVENTURE_BOOT),1)
+  ADVENTURE_BOOT_CFLAGS = -DSONICR_ADVENTURE_BOOT=1
+else
+  ADVENTURE_BOOT_CFLAGS =
+endif
+
 CFLAGS = -I$(DC_SRCDIR) -I$(SDL_SRCDIR) \
          -std=gnu11 -O3 -g -fno-common -Wall -Wno-unused -Wno-parentheses \
          -Wno-strict-aliasing -Wno-unused-result -Wno-misleading-indentation \
@@ -74,7 +82,7 @@ CFLAGS = -I$(DC_SRCDIR) -I$(SDL_SRCDIR) \
          -Wno-type-limits -Wno-stringop-overflow -Wno-unused-but-set-variable \
          -Wno-implicit-fallthrough -Wno-pointer-sign -Wno-stringop-truncation \
          -DSONICR_SDL -DSONICR_DC -DSONICR_FLOAT32 -DSONICR_MATCHMAKER -DBLURRY \
-         -DDATA_DIR='"/cd"' $(DEBUG_LOG_CFLAGS)
+         -DDATA_DIR='"/cd"' $(DEBUG_LOG_CFLAGS) $(ADVENTURE_BOOT_CFLAGS)
 
 # -DSONICR_DC_240P
 

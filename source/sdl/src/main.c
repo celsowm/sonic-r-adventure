@@ -20,6 +20,7 @@
 #include "net_transport.h"
 #include "net/matchmaker.h"
 #include "net/net_interp.h"
+#include "adventure/adventure_mode.h"
 
 /* Shared keystate from the platform layer */
 extern unsigned char s_keystate[256];
@@ -172,6 +173,11 @@ const char *g_cmdHostIP = NULL;
  * SDL also accepts -u to set this explicitly. */
 static int s_cmdUnlock = 0;
 static int s_cmdFullscreen = 0;
+#ifdef SONICR_ADVENTURE_BOOT
+static int s_cmdAdventure = 1; /* Optional preview boot mode */
+#else
+static int s_cmdAdventure = 0;
+#endif
 static int s_cmdPort = -1;
 static char s_cmdUsername[MM_MAX_USERNAME];
 
@@ -526,6 +532,7 @@ int main(int argc, char *argv[])
         {"unlock", no_argument, NULL, 'u'},
         {"fullscreen", no_argument, NULL, 'f'},
         {"username", required_argument, NULL, 'n'},
+        {"adventure", no_argument, NULL, 'a'},
         {NULL, 0, NULL, 0}};
     int opt;
     while ((opt = getopt_long(argc, argv, "", long_opts, NULL)) != -1) {
@@ -538,6 +545,9 @@ int main(int argc, char *argv[])
                 break;
             case 'p':
                 s_cmdPort = atoi(optarg);
+                break;
+            case 'a':
+                s_cmdAdventure = 1;
                 break;
             case 'u':
                 s_cmdUnlock = 1;
@@ -775,6 +785,25 @@ def SONICR_DC /* DC splash screen */
      * here: SCREEN_BACK is 0, so routing one through this would zero the
      * viewport count and skip every per-player init loop downstream. */
     int mpPlayerCount = 0;
+
+    /* WP-01: adventure boots directly into the resource-loading path.
+     * The default path continues through the unchanged title/race menus. */
+    if (s_cmdAdventure) {
+        InitCD();
+        ResetInputState();
+        InitOptionStuff();
+        g_demoMode = DEMO_NONE;
+        g_raceType = RACE_GP; /* legacy loader expects a known race type */
+        g_raceSubMode = SUBMODE_NORMAL;
+        g_trackId = TRACK_RESORT_ISLAND;
+        g_playerBase[0].charId = CHAR_SONIC;
+        g_numHumans = 1;
+        g_numViewports = 1;
+        g_numPlayers = 5; /* preserve loader's original player allocation */
+        g_netSessionActive = 0;
+        g_isNetworkGame = 0;
+        goto race_setup;
+    }
 
 title_sequence:
     InitCD();
@@ -1225,6 +1254,16 @@ race_setup:
      * past SET. SDL: connection is already confirmed via NET_MSG_START_GAME
      * before the race loop begins, so all players are ready immediately. */
     g_netReadyFlag = 1;
+
+    /* Resource bootstrap is complete; enter our isolated fixed-tick preview
+     * before the original InitRaceStart/race-update loop is invoked. */
+    if (s_cmdAdventure) {
+        int adventureResult = AdventureMode_RunPreview();
+        StopAmbientSounds();
+        StopCD();
+        Shutdown();
+        return adventureResult;
+    }
 
     /* Initialize race — 0x471A04.
      * Sets intro countdown (0xD2), lap times, AI setup, player physics.

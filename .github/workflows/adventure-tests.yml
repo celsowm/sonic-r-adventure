@@ -1,0 +1,21 @@
+name: Adventure lifecycle tests
+
+on:
+  push:
+    paths:
+      - "source/sdl/src/adventure/**"
+      - "tests/adventure/**"
+      - ".github/workflows/adventure-tests.yml"
+  pull_request:
+    paths:
+      - "source/sdl/src/adventure/**"
+      - "tests/adventure/**"
+      - ".github/workflows/adventure-tests.yml"
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run platform-neutral adventure tests
+        run: make -C tests/adventure test

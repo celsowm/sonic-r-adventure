@@ -105,13 +105,21 @@ endif
 #         -Wno-unused-parameter \
 
 
+# Optional action-mode boot. Run 'make clean' when toggling flags.
+ADVENTURE_BOOT ?= 0
+ifeq ($(ADVENTURE_BOOT),1)
+  ADVENTURE_BOOT_CFLAGS = -DSONICR_ADVENTURE_BOOT=1
+else
+  ADVENTURE_BOOT_CFLAGS =
+endif
+
 CFLAGS = -I$(SRCDIR) -std=c11 -Os -g -Wall -Wextra -Werror \
          $(SANITIZE) -fno-common \
          -Wno-void-pointer-to-int-cast -Wno-int-to-void-pointer-cast \
          -Werror=pointer-to-int-cast -Werror=int-to-pointer-cast \
          -DSONICR_SDL -DSONICR_DEBUG_LOG \
          $(PLATFORM_CFLAGS) $(GL_CFLAGS) \
-         $(SDL_CFLAGS) $(MATCHMAKER_CFLAGS) $(FLOAT32_CFLAGS) $(SOFT_CFLAGS)
+         $(SDL_CFLAGS) $(MATCHMAKER_CFLAGS) $(FLOAT32_CFLAGS) $(SOFT_CFLAGS) $(ADVENTURE_BOOT_CFLAGS)
 LDFLAGS = $(SANITIZE) $(GL_LIBS) -lm $(SDL_LIBS) $(MATCHMAKER_LIBS) $(EXTRA_LDFLAGS)
 
 # Object files
@@ -129,7 +137,7 @@ RELEASE_CFLAGS = -I$(SRCDIR) -std=c11 -Os -g -Wall -Wextra \
                  -Wno-void-pointer-to-int-cast -Wno-int-to-void-pointer-cast \
                  -DSONICR_SDL \
                          $(PLATFORM_CFLAGS) $(GL_CFLAGS) \
-                 $(SDL_CFLAGS) $(MATCHMAKER_CFLAGS) $(FLOAT32_CFLAGS) $(SOFT_CFLAGS)
+                 $(SDL_CFLAGS) $(MATCHMAKER_CFLAGS) $(FLOAT32_CFLAGS) $(SOFT_CFLAGS) $(ADVENTURE_BOOT_CFLAGS)
 RELEASE_LDFLAGS = $(GL_LIBS) -lm $(SDL_LIBS) $(MATCHMAKER_LIBS) $(EXTRA_LDFLAGS)
 RELEASE_OBJS = $(patsubst $(SRCDIR)/%.c, $(RELEASE_BUILDDIR)/%.o, $(CSRC))
 RELEASE_TARGET = $(RELEASE_BUILDDIR)/sonicr
