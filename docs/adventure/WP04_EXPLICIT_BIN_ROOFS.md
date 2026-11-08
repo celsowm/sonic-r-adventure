@@ -1,4 +1,4 @@
-# WP-04.5 — Explicitly authored visual roof triangles
+# WP-04.6 — Explicitly authored visual roof triangles and head-sphere contacts
 
 ## Why there is no automatic BIN→collision conversion
 
@@ -23,16 +23,18 @@ Only after visual inspection confirms that a particular **track-part quad** is a
 
 ## Narrow-phase and gameplay integration
 
-The new portable `adventure_roof.c` performs a **continuous upward head-point / finite triangle face** test. For upward movement, it computes an analytic segment/plane crossing in Q20.12, verifies the point lies inside the chosen face using 2D barycentric/cross-product tests, and returns its fraction of the fixed tick. The player retains the earlier of this hit and the existing TER underside collision, with a small separation skin. A successful upward hit stops vertical motion; the player then falls under gravity.
+The portable `adventure_roof.c` now performs a **continuous upward swept head-sphere / finite triangle** test. For upward movement, it computes analytic contact against the plane offset by the head sphere's radius, tests the projected point inside the roof footprint, then checks the sphere's earliest approach to each of the triangle's three finite edges, including their endpoints (vertices). Edge contacts use a bounded deterministic convex minimum and first-crossing search in Q12 time, rather than frame-based positional samples.
+
+The capsule height is the **total body height**. The head sphere center is at `footY + capsule_height - capsule_radius`, preserving the old planar roof-contact height while adding lateral radius coverage. The player retains the earlier of this hit and the existing TER underside collision, with a small separation skin. A successful upward hit stops vertical motion; the player then falls under gravity.
 
 - Accepts reversed triangle winding and slopes up to a conservative limit.
 - Uses integer arithmetic, no `sqrt`, `atan2` or floating-point physics; suitable for deterministic C tests and SH-4.
-- Unit tests exercise plane-time intersection, start-touched roof, rejected back-side hit, finite face bounds, sloped/diagonal impact, opt-in-only behavior, multiple roof ordering and full game tick head bonk.
+- Unit tests exercise plane-time intersection, start-touched roof, rejected back-side hit, sloped/diagonal impact, opt-in-only behavior, **sphere-only edge and vertex contacts**, grazing without sticky escape, multiple roof ordering, variable sphere radius and full-game head bonks.
 - All new code is isolated under `source/sdl/src/adventure`. Racing physics and authored game data are unchanged.
 
 ### Important limits
 
-**This is not a full continuous swept capsule vs arbitrary triangle algorithm.** The analytic test uses Sonic's head **point**, not his head's sphere radius, and does not yet resolve roof edges/vertices, the capsule side, complex steep vertical walls, dynamic geometry or arbitrary scenery transformations. The pre-existing static-wall swept disc and TER floor/underside sweep remain in effect. Full capsule contact and collision materials require another pass.
+**This is not a full continuous swept capsule vs arbitrary triangle algorithm.** It resolves the **head sphere** against selected roof faces/edges/vertices, but does not sweep the remaining body shaft, the lower endcap, complex steep vertical walls, dynamic geometry or arbitrary scenery transformations. Edge/vertex time of impact uses a bounded Q12 integer convex distance search rather than a closed-form quadratic root. The pre-existing static-wall swept disc and TER floor/underside sweep remain in effect. Full capsule side contacts and collision materials require another pass. Collision faces must still be opt-in; the default visual-roof manifest remains intentionally empty.
 
 Actual visual play-testing, determining individual solid roofs and Dreamcast timing are still outstanding; an empty opt-in manifest is intentional until that review.
 

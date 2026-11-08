@@ -20,12 +20,14 @@ typedef struct AdventureRoofHit {
 } AdventureRoofHit;
 void AdventureRoof_Clear(AdventureRoofMesh *mesh);
 bool AdventureRoof_Add(AdventureRoofMesh *mesh, AdventureRoofTriangle triangle);
-/* Analytic segment vs roof TRIANGLE FACE; radius/edge/vertex capsule contacts
- * are deliberately outside this narrow-phase and need a future solver. */
+/* Continuous upward swept HEAD SPHERE against selected roof faces, edges
+ * and vertices. Radius is Q20.12. This is not a full body capsule sweep. */
 bool AdventureRoof_SweepTriangle(AdventureVec3 head_from,
                                  AdventureVec3 head_to,
                                  const AdventureRoofTriangle *triangle,
+                                 int32_t head_radius,
                                  AdventureRoofHit *out);
 bool AdventureRoof_SweepMesh(void *context, AdventureVec3 head_from,
-                             AdventureVec3 head_to, AdventureRoofHit *out);
+                             AdventureVec3 head_to, int32_t head_radius,
+                             AdventureRoofHit *out);
 #endif

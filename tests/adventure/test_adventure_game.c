@@ -611,7 +611,7 @@ static void test_diagonal_terrain_sweeps(void)
     AdventureVerticalContact c;
     AdventureVec3 from={0,14*ADV_FP_ONE,ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,4*ADV_FP_ONE,ADV_FP_ONE};
-    assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,false,&c));
+    assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,ADV_FP_ONE,false,&c));
     assert(c.surface.surface_id==42);
     assert(c.position.x>=5*ADV_FP_ONE &&
            c.position.x<5*ADV_FP_ONE+ADV_FP_ONE/2);
@@ -619,7 +619,7 @@ static void test_diagonal_terrain_sweeps(void)
     assert(c.fraction<ADV_FP_ONE);
     from.y=10*ADV_FP_ONE;
     to.y=30*ADV_FP_ONE;
-    assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&c));
+    assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,ADV_FP_ONE,true,&c));
     assert(c.surface.surface_id==42);
     assert(c.position.y>15*ADV_FP_ONE &&
            c.position.y<16*ADV_FP_ONE);
@@ -636,16 +636,16 @@ static void test_diagonal_sweep_no_false_contact(void)
     AdventureVerticalContact c;
     AdventureVec3 from={0,14*ADV_FP_ONE,-2*ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,4*ADV_FP_ONE,-2*ADV_FP_ONE};
-    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,false,&c));
+    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,ADV_FP_ONE,false,&c));
     from.y=10*ADV_FP_ONE;
     to.y=30*ADV_FP_ONE;
-    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&c));
+    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,ADV_FP_ONE,true,&c));
     /* A roof starting below an already elevated head is not an overhead
      * contact: it should be blocked by side geometry, not snapped below. */
     from.z=ADV_FP_ONE;to.z=ADV_FP_ONE;
     from.y=18*ADV_FP_ONE;
     to.y=32*ADV_FP_ONE;
-    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&c));
+    assert(!AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,ADV_FP_ONE,true,&c));
 }
 static void test_diagonal_sweep_replay(void)
 {
@@ -654,8 +654,8 @@ static void test_diagonal_sweep_replay(void)
     AdventureVec3 from={0,10*ADV_FP_ONE,ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,30*ADV_FP_ONE,ADV_FP_ONE};
     for(int i=0;i<100;i++){
-        assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&a));
-        assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,true,&b));
+        assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,ADV_FP_ONE,true,&a));
+        assert(AdventureVertical_Sweep(t,from,to,4*ADV_FP_ONE,ADV_FP_ONE,true,&b));
         assert(a.position.x==b.position.x);
         assert(a.position.y==b.position.y);
         assert(a.position.z==b.position.z);
@@ -739,26 +739,26 @@ static void test_analytic_roof_sweep(void)
     AdventureVec3 from={2*ADV_FP_ONE,10*ADV_FP_ONE,2*ADV_FP_ONE};
     AdventureVec3 to={2*ADV_FP_ONE,30*ADV_FP_ONE,2*ADV_FP_ONE};
     AdventureRoofHit hit;
-    assert(AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(AdventureRoof_SweepTriangle(from,to,&t,0,&hit));
     assert(hit.fraction==ADV_FP_ONE/2);
     assert(hit.triangle_id==71);
     /* Winding must not change physical solidity of an explicitly picked roof. */
     AdventureVec3 swap=t.b; t.b=t.c; t.c=swap;
-    assert(AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(AdventureRoof_SweepTriangle(from,to,&t,0,&hit));
     assert(hit.fraction==ADV_FP_ONE/2);
     from.y=22*ADV_FP_ONE;
-    assert(!AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(!AdventureRoof_SweepTriangle(from,to,&t,0,&hit));
     from.y=10*ADV_FP_ONE;
     from.x=9*ADV_FP_ONE;from.z=9*ADV_FP_ONE;
     to.x=from.x;to.z=from.z;
-    assert(!AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(!AdventureRoof_SweepTriangle(from,to,&t,0,&hit));
     to.y=from.y;
-    assert(!AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(!AdventureRoof_SweepTriangle(from,to,&t,0,&hit));
     /* The true time-of-impact does not depend on velocity substep count. */
     from.x=2*ADV_FP_ONE;from.z=2*ADV_FP_ONE;
     to.x=from.x;to.z=from.z;
     from.y=20*ADV_FP_ONE;to.y=21*ADV_FP_ONE;
-    assert(AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(AdventureRoof_SweepTriangle(from,to,&t,0,&hit));
     assert(hit.fraction==0u);
 }
 static void test_roof_mesh_opt_in_and_priority(void)
@@ -768,13 +768,13 @@ static void test_roof_mesh_opt_in_and_priority(void)
     AdventureRoofHit hit;
     AdventureVec3 from={2*ADV_FP_ONE,10*ADV_FP_ONE,2*ADV_FP_ONE};
     AdventureVec3 to={2*ADV_FP_ONE,30*ADV_FP_ONE,2*ADV_FP_ONE};
-    assert(!AdventureRoof_SweepMesh(&mesh,from,to,&hit));
+    assert(!AdventureRoof_SweepMesh(&mesh,from,to,0,&hit));
     AdventureRoofTriangle a=roof(22*ADV_FP_ONE,22);
     AdventureRoofTriangle b=roof(15*ADV_FP_ONE,15);
     assert(AdventureRoof_Add(&mesh,a));
     assert(AdventureRoof_Add(&mesh,b));
     assert(mesh.count==2);
-    assert(AdventureRoof_SweepMesh(&mesh,from,to,&hit));
+    assert(AdventureRoof_SweepMesh(&mesh,from,to,0,&hit));
     assert(hit.triangle_id==15);
     assert(hit.fraction==ADV_FP_ONE/4);
     /* Explicitly reject vertical, degenerate or unbounded additions. */
@@ -796,13 +796,13 @@ static void test_sloped_roof_and_diagonal_face(void)
     AdventureVec3 from={0,10*ADV_FP_ONE,2*ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,35*ADV_FP_ONE,2*ADV_FP_ONE};
     AdventureRoofHit hit;
-    assert(AdventureRoof_SweepTriangle(from,to,&sloped,&hit));
+    assert(AdventureRoof_SweepTriangle(from,to,&sloped,0,&hit));
     assert(hit.fraction>ADV_FP_ONE/3);
     assert(hit.fraction<3*ADV_FP_ONE/4);
     assert(hit.triangle_id==45);
     /* Point only intersects the finite roof face mid-path, not at either end. */
     from.z=-5*ADV_FP_ONE;to.z=-5*ADV_FP_ONE;
-    assert(!AdventureRoof_SweepTriangle(from,to,&sloped,&hit));
+    assert(!AdventureRoof_SweepTriangle(from,to,&sloped,0,&hit));
 }
 
 static void test_roof_edges_and_capacity(void)
@@ -813,9 +813,9 @@ static void test_roof_edges_and_capacity(void)
     AdventureRoofHit hit;
     /* An exact triangle corner must not disappear because the Q12 time
      * fraction was rounded during analytic plane intersection. */
-    assert(AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(AdventureRoof_SweepTriangle(from,to,&t,0,&hit));
     from.x=11*ADV_FP_ONE;to.x=11*ADV_FP_ONE;
-    assert(!AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(!AdventureRoof_SweepTriangle(from,to,&t,0,&hit));
     AdventureRoofMesh mesh;
     AdventureRoof_Clear(&mesh);
     for(unsigned i=0;i<ADV_ROOF_MAX_TRIANGLES;i++){
@@ -827,7 +827,7 @@ static void test_roof_edges_and_capacity(void)
     assert(mesh.count==ADV_ROOF_MAX_TRIANGLES);
     AdventureRoof_Clear(&mesh);
     assert(mesh.count==0);
-    assert(!AdventureRoof_SweepMesh(&mesh,from,to,&hit));
+    assert(!AdventureRoof_SweepMesh(&mesh,from,to,0,&hit));
 }
 
 static void test_roof_in_vertical_gameplay(void)
@@ -860,6 +860,100 @@ static void test_roof_in_vertical_gameplay(void)
     assert(landed && game.player.pos.y==0);
 }
 
+
+/* Swept HEAD SPHERE: tests that the old point-only roof cast could not pass.
+ * A radius-one head must hit a finite edge or its vertex even if the head
+ * center passes OUTSIDE the triangle footprint throughout the whole tick. */
+static void test_roof_sphere_face_edge_and_vertices(void)
+{
+    AdventureRoofTriangle tri=roof(20*ADV_FP_ONE,401);
+    AdventureRoofHit hit;
+    AdventureVec3 from={2*ADV_FP_ONE,10*ADV_FP_ONE,2*ADV_FP_ONE};
+    AdventureVec3 to={2*ADV_FP_ONE,30*ADV_FP_ONE,2*ADV_FP_ONE};
+    /* Point-face crossing occurs at 0.5; the spherical head hits at 0.45. */
+    assert(AdventureRoof_SweepTriangle(from,to,&tri,0,&hit));
+    assert(hit.fraction==2048);
+    assert(AdventureRoof_SweepTriangle(from,to,&tri,ADV_FP_ONE,&hit));
+    assert(hit.fraction>1800 && hit.fraction<1900);
+
+    /* Edge AB: center stays 0.5 units outside z=0. */
+    from.z=-ADV_FP_ONE/2;to.z=from.z;
+    assert(!AdventureRoof_SweepTriangle(from,to,&tri,0,&hit));
+    assert(AdventureRoof_SweepTriangle(from,to,&tri,ADV_FP_ONE,&hit));
+    assert(hit.fraction>1750 && hit.fraction<2048);
+    assert(hit.triangle_id==401);
+
+    /* Vertex A: sphere overlaps vertex despite missing all three edges. */
+    from.x=-ADV_FP_ONE/2;to.x=from.x;
+    assert(AdventureRoof_SweepTriangle(from,to,&tri,ADV_FP_ONE,&hit));
+    assert(hit.fraction>1800 && hit.fraction<2048);
+    from.x=-2*ADV_FP_ONE;to.x=from.x;
+    from.z=-2*ADV_FP_ONE;to.z=from.z;
+    assert(!AdventureRoof_SweepTriangle(from,to,&tri,ADV_FP_ONE,&hit));
+
+    /* Approaching from the upper side never blocks movement upward. */
+    from.x=2*ADV_FP_ONE;to.x=from.x;
+    from.z=2*ADV_FP_ONE;to.z=from.z;
+    from.y=21*ADV_FP_ONE;to.y=30*ADV_FP_ONE;
+    assert(!AdventureRoof_SweepTriangle(from,to,&tri,ADV_FP_ONE,&hit));
+}
+static void test_roof_sphere_not_sticky_on_exit(void)
+{
+    AdventureRoofTriangle tri=roof(20*ADV_FP_ONE,402);
+    AdventureRoofHit hit;
+    AdventureVec3 from={2*ADV_FP_ONE,20*ADV_FP_ONE-ADV_FP_ONE/4,
+                        -ADV_FP_ONE/2};
+    AdventureVec3 to={2*ADV_FP_ONE,20*ADV_FP_ONE-ADV_FP_ONE/8,
+                      -2*ADV_FP_ONE};
+    /* Start near the edge, then move away horizontally while going up. */
+    assert(!AdventureRoof_SweepTriangle(from,to,&tri,ADV_FP_ONE,&hit));
+    to.y=30*ADV_FP_ONE;
+    to.z=-ADV_FP_ONE/2;
+    assert(AdventureRoof_SweepTriangle(from,to,&tri,ADV_FP_ONE,&hit));
+    assert(hit.fraction==0);
+}
+static void test_roof_sphere_priority(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    assert(AdventureRoof_Add(&mesh,roof(22*ADV_FP_ONE,22)));
+    assert(AdventureRoof_Add(&mesh,roof(15*ADV_FP_ONE,15)));
+    AdventureVec3 from={2*ADV_FP_ONE,10*ADV_FP_ONE,
+                        -ADV_FP_ONE/2};
+    AdventureVec3 to={2*ADV_FP_ONE,30*ADV_FP_ONE,
+                      -ADV_FP_ONE/2};
+    AdventureRoofHit hit;
+    assert(AdventureRoof_SweepMesh(&mesh,from,to,ADV_FP_ONE,&hit));
+    assert(hit.triangle_id==15);
+    assert(hit.fraction<ADV_FP_ONE/4);
+    /* Larger sphere reaches the edge sooner. */
+    uint16_t smaller=hit.fraction;
+    assert(AdventureRoof_SweepMesh(&mesh,from,to,2*ADV_FP_ONE,&hit));
+    assert(hit.fraction<=smaller);
+}
+static void test_roof_sphere_game_tick_graze(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    assert(AdventureRoof_Add(&mesh,roof(8*ADV_FP_ONE,406)));
+    AdventureTerrain terrain={test_world_ground,&mesh,0,0,
+                              AdventureRoof_SweepMesh};
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureGame_SetTerrain(&game,terrain);
+    /* Game's ground mock has no Z restriction, roof is bounded by z>=0. */
+    AdventureVec3 spawn={2*ADV_FP_ONE,0,-ADV_FP_ONE/2};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(game.player.grounded);
+    AdventureRawInput raw={0};
+    raw.buttons=ADV_ACTION_JUMP;
+    assert(AdventureGame_Tick(&game,raw,kEast));
+    assert(!game.player.grounded);
+    assert(game.player.velocity.y==0);
+    assert(game.player.pos.y>=3*ADV_FP_ONE &&
+           game.player.pos.y<4*ADV_FP_ONE);
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -890,5 +984,9 @@ int main(void)
     test_sloped_roof_and_diagonal_face();
     test_roof_in_vertical_gameplay();
     test_roof_edges_and_capacity();
+    test_roof_sphere_face_edge_and_vertices();
+    test_roof_sphere_not_sticky_on_exit();
+    test_roof_sphere_priority();
+    test_roof_sphere_game_tick_graze();
     return 0;
 }

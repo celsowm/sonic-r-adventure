@@ -51,10 +51,11 @@ static bool crossed(AdventureTerrain terrain,AdventureVec3 from,
 }
 bool AdventureVertical_Sweep(AdventureTerrain terrain,
                              AdventureVec3 from, AdventureVec3 to,
-                             int32_t capsule_height, bool rising,
-                             AdventureVerticalContact *contact)
+                             int32_t capsule_height, int32_t capsule_radius,
+                             bool rising, AdventureVerticalContact *contact)
 {
-    if (!contact || capsule_height<=0 || (rising ? to.y<=from.y
+    if (!contact || capsule_height<=0 || capsule_radius<0 ||
+        (int64_t)capsule_radius*2>capsule_height || (rising ? to.y<=from.y
                                                  : to.y>=from.y)) return false;
     int64_t dx=(int64_t)to.x-from.x, dz=(int64_t)to.z-from.z;
     uint32_t dist=AdventureMath_IsqrtU64((uint64_t)(dx*dx+dz*dz));
@@ -102,12 +103,15 @@ bool AdventureVertical_Sweep(AdventureTerrain terrain,
     }
     if (rising && terrain.sweep_roof) {
         AdventureVec3 head_from=from,head_to=to;
+        /* capsule_height is the total body height, including rounded top;
+         * therefore the head sphere CENTER sits one radius below it. */
         head_from.y=AdventureMath_ClampI32(
-            (int64_t)from.y+capsule_height);
+            (int64_t)from.y+capsule_height-capsule_radius);
         head_to.y=AdventureMath_ClampI32(
-            (int64_t)to.y+capsule_height);
+            (int64_t)to.y+capsule_height-capsule_radius);
         AdventureRoofHit roof;
-        if (terrain.sweep_roof(terrain.context,head_from,head_to,&roof) &&
+        if (terrain.sweep_roof(terrain.context,head_from,head_to,
+                               capsule_radius,&roof) &&
             (!found || roof.fraction<best.fraction)) {
             best.fraction=roof.fraction;
             best.position=position_at(from,to,roof.fraction);

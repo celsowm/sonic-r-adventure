@@ -24,9 +24,10 @@ typedef struct AdventureTerrain {
     void *context;
     AdventureWallQuery sweep_wall; /* optional static-wall collision */
     AdventureOverheadQuery query_overhead; /* optional nearest floor above head */
-    /* Optional continuous HEAD-POINT collision with explicitly authored BIN
-     * roof faces. The same terrain.context is passed to this callback. */
+    /* Optional swept head SPHERE against explicitly authored BIN roofs.
+     * The terrain.context is passed unchanged to this callback. */
     bool (*sweep_roof)(void *context, AdventureVec3 head_from,
-                       AdventureVec3 head_to, AdventureRoofHit *hit);
+                       AdventureVec3 head_to, int32_t radius,
+                       AdventureRoofHit *hit);
 } AdventureTerrain;
 #endif

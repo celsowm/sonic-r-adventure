@@ -9,10 +9,11 @@ typedef struct AdventureVerticalContact {
     AdventureGroundHit surface;
     uint16_t fraction;      /* Q12 fraction along full 3D trajectory */
 } AdventureVerticalContact;
-/* Rising hits an underside with the head; falling lands with the feet.
- * Does not resolve arbitrary scenery triangles or complete capsule side walls. */
+/* Rising hits a TER platform underside or selected visual roof using a head
+ * sphere whose center is at footY+height-radius. Falling uses foot heights.
+ * Full swept capsule side contacts and dynamic geometry are not handled. */
 bool AdventureVertical_Sweep(AdventureTerrain terrain,
                              AdventureVec3 from, AdventureVec3 to,
-                             int32_t capsule_height, bool rising,
-                             AdventureVerticalContact *contact);
+                             int32_t capsule_height, int32_t capsule_radius,
+                             bool rising, AdventureVerticalContact *contact);
 #endif

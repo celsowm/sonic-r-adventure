@@ -149,7 +149,7 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
         bool rising=p->velocity.y>0;
         AdventureVerticalContact contact;
         if (AdventureVertical_Sweep(terrain,from,to,ADV_CAPSULE_HEIGHT,
-                                     rising,&contact)) {
+                                     ADV_CAPSULE_RADIUS,rising,&contact)) {
             p->pos=contact.position;
             /* Stop at the first intersecting footprint rather than skipping
              * a narrow platform and drifting through its far side. */

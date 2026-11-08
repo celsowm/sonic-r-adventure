@@ -17,9 +17,9 @@
 
 This is deliberately **not** the full collision solution specified in the master plan.
 
-- **Partial collision only:** Static .TER walls have horizontal swept-disc contacts, elevated TER floors block upward head movement, and explicitly authored visual BIN roof faces can be tested by analytic head-point/triangle-plane TOI. No visual roofs are approved by default; full swept capsules, arbitrary scenery and moving platforms remain incomplete.
+- **Partial collision only:** Static .TER walls have horizontal swept-disc contacts, elevated TER floors block upward head movement, and explicitly authored visual BIN roof faces can be tested by continuous head-sphere contacts against faces, edges and vertices. No visual roofs are approved by default; full swept capsules, arbitrary scenery and moving platforms remain incomplete.
 - **Special meshes excluded:** loop/ride surfaces, special dynamic geometry, moving platforms and destructible items still need explicit collision providers.
-- **Sweeps are incomplete:** Horizontal static-wall sweeps and sampled diagonal foot/head checks are in place, but exact 3D capsule/triangle TOI, radial floor-edge contacts and thin dynamic geometry are not yet solved.
+- **Sweeps are incomplete:** Horizontal static-wall sweeps and sampled diagonal foot/head checks are in place, but full-body 3D capsule/triangle TOI, radial floor-edge contacts and thin dynamic geometry are not yet solved.
 - **No slope normals:** ramp elevation follows `.TER` geometry but slope-dependent friction, walkability thresholds and steep-slope sliding are not yet implemented.
 - **No respawn checkpoint or death plane:** falling off the stage currently has no recoverable action-state exit.
 - **No gameplay animation mapping:** jump and fall phases have pure simulation states but render animation still needs integration.
