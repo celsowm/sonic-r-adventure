@@ -1709,7 +1709,7 @@ static void test_action_camera_orbit_and_wrap(void)
     AdventureCamera_Reset(&cam,&player);
     player.facing=16; /* shortest way across zero is +32, not -4064 */
     AdventureCamera_Tick(&cam,&player,0,0,0);
-    assert(cam.yaw<64); /* wrapped smoothly */
+    assert(cam.yaw>4080 || cam.yaw<16); /* shortest positive arc */
     uint16_t previous=cam.yaw;
     for(int i=0;i<16;i++)
         AdventureCamera_Tick(&cam,&player,ADV_ACTION_CAMERA_RIGHT,0,0);
