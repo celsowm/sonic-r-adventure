@@ -30,13 +30,14 @@ static bool query_ter_height(int32_t x, int32_t z, int32_t threshold,
         !g_terFaceTable || !g_terVertexTable ||
         g_aiGridCellWidth <= 0 || g_aiGridCellHeight <= 0) return false;
 
-    /* Reject negative offsets BEFORE integer division (truncates to zero).
-     * Otherwise x just outside the grid could accidentally select cell 0. */
-    int64_t grid_x = (int64_t)x / ADV_FP_ONE - g_aiGridOriginX;
-    int64_t grid_z = (int64_t)z / ADV_FP_ONE - g_aiGridOriginZ;
+    /* Compute offsets in Q20.12 BEFORE division. C truncates negative
+     * division toward zero, so pre-shifting the coordinate could wrongly
+     * admit a point one fractional unit outside cell zero. */
+    int64_t grid_x = (int64_t)x - (int64_t)g_aiGridOriginX * ADV_FP_ONE;
+    int64_t grid_z = (int64_t)z - (int64_t)g_aiGridOriginZ * ADV_FP_ONE;
     if (grid_x < 0 || grid_z < 0) return false;
-    int64_t cell_x = grid_x / g_aiGridCellWidth;
-    int64_t cell_z = grid_z / g_aiGridCellHeight;
+    int64_t cell_x = grid_x / ((int64_t)g_aiGridCellWidth * ADV_FP_ONE);
+    int64_t cell_z = grid_z / ((int64_t)g_aiGridCellHeight * ADV_FP_ONE);
     if (cell_x >= 32 || cell_z >= 32) return false;
     const int16_t *grid = (const int16_t *)g_terGridIndex;
     int16_t offset = grid[cell_z * 32 + cell_x];

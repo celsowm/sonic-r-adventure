@@ -1,6 +1,6 @@
 # WP-04: Vertical Physics and Terrain Support — First Integration
 
-**Status:** Initial implementation; action-platformer collision coverage is not complete.
+**Status:** Floor, static-wall and elevated-platform underside collision integrated. Full 3D capsule/mesh collision coverage and real gameplay verification remain incomplete. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
 
 ## Implemented
 
@@ -17,9 +17,9 @@
 
 This is deliberately **not** the full collision solution specified in the master plan.
 
-- **No walls or ceilings:** a player can currently pass through vertical scene geometry or jump up through a ceiling. Capsule sweeps and collision mesh support are a separate next step.
-- **Only floor surfaces:** loop/ride surfaces, special dynamic geometry, moving platforms and destructible items need their own explicit providers.
-- **Downward sweep is vertical only:** high-speed horizontal movement can still tunnel through thin obstacles; a capsule cast should be used before permitting high-speed gameplay.
+- **Partial collision only:** Static .TER walls now have horizontal swept-disc contacts and elevated floor polygons block upward head movement, but arbitrary scenery roofs, full 3D swept capsules and moving platforms can still be passed through.
+- **Special meshes excluded:** loop/ride surfaces, special dynamic geometry, moving platforms and destructible items still need explicit collision providers.
+- **Sweeps are incomplete:** Horizontal static-wall sweeps are bounded/substepped and upward/downward floor checks are sampled at the resolved X/Z coordinate; true full-3D sweeps are still needed for diagonal impacts and thin dynamic geometry.
 - **No slope normals:** ramp elevation follows `.TER` geometry but slope-dependent friction, walkability thresholds and steep-slope sliding are not yet implemented.
 - **No respawn checkpoint or death plane:** falling off the stage currently has no recoverable action-state exit.
 - **No gameplay animation mapping:** jump and fall phases have pure simulation states but render animation still needs integration.
@@ -49,6 +49,6 @@ Controls: WASD/arrows or left stick move; Space / A jumps; ESC or START exits pr
 
 1. Verify `.TER` height and floor identity on actual Resort Island geometry; capture signed coordinate traces on both platforms.
 2. Implement walkable slope normals and surface-angle limits.
-3. Add capsule sweeps for horizontal walls and ceilings, including safe iterative contact resolution and sliding.
+3. Replace separate horizontal-disc and head/feet sweeps with a complete 3D capsule/triangle narrow phase and valid roof geometry when such geometry exists.
 4. Add moving platform support and reliable transitions between collision layers.
 5. Add death-plane/respawn and action animations before claiming the vertical slice is playable.
