@@ -69,7 +69,8 @@ int AdventureMode_RunPreview(void)
     AdventureTerrain terrain = {AdventureRoofLegacy_QueryGround, &s_selected_roofs,
                                 AdventureTerrain_SweepLegacyWall,
                                 AdventureTerrain_QueryLegacyOverhead,
-                                AdventureCapsule_SweepMesh};
+                                AdventureCapsule_SweepMesh,
+                                AdventureRoofLegacy_QueryNormal};
     AdventureGame_SetTerrain(&game, terrain);
 
     /* InitLevel already populated the original game resources and Player[0].

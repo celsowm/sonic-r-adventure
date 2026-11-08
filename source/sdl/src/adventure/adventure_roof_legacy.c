@@ -106,3 +106,15 @@ bool AdventureRoofLegacy_QueryGround(void *context,int32_t x,int32_t z,
     if(has_ter || has_roof) *out=ground;
     return has_ter || has_roof;
 }
+
+bool AdventureRoofLegacy_QueryNormal(void *context,int32_t x,int32_t z,
+                                      int32_t surface_id,AdventureVec3 *out)
+{
+    if(!out) return false;
+    if(surface_id>=0)
+        return AdventureTerrain_QueryLegacyNormal(0,x,z,surface_id,out);
+    if(surface_id==-1) return false; /* airborne */
+    int64_t roof_id=-(int64_t)surface_id-2;
+    if(roof_id<0 || roof_id>INT32_MAX) return false;
+    return AdventureRoof_QueryNormal(context,(int32_t)roof_id,out);
+}

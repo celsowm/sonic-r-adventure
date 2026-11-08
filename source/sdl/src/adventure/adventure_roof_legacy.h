@@ -6,6 +6,8 @@
 #include "adventure_terrain.h"
 void AdventureRoofLegacy_LoadSelected(AdventureRoofMesh *mesh, int track_id);
 /* Merge original TER support with authored walkable BIN roofs. */
+bool AdventureRoofLegacy_QueryNormal(void *context,int32_t x,int32_t z,
+                                      int32_t surface_id,AdventureVec3 *out);
 bool AdventureRoofLegacy_QueryGround(void *context, int32_t x, int32_t z,
                                      int32_t max_height,
                                      AdventureGroundHit *out);

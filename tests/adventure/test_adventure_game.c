@@ -4,6 +4,7 @@
 #include "../../source/sdl/src/adventure/adventure_capsule.h"
 #include "../../source/sdl/src/adventure/adventure_slide.h"
 #include "../../source/sdl/src/adventure/adventure_solver.h"
+#include "../../source/sdl/src/adventure/adventure_slope.h"
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
@@ -189,7 +190,7 @@ static void test_world_spawn_and_ramp(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0,0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, spawn, 0);
@@ -208,7 +209,7 @@ static void test_jump_and_landing(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0,0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, spawn, 0);
@@ -238,7 +239,7 @@ static void test_stacked_floor_and_ledge(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0,0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 lower = {35 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, lower, 0);
@@ -267,7 +268,7 @@ static void test_world_replay(void)
     AdventureGame a, b;
     AdventureGame_Init(&a);
     AdventureGame_Init(&b);
-    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0,0};
     AdventureGame_SetTerrain(&a, terrain);
     AdventureGame_SetTerrain(&b, terrain);
     AdventureVec3 start = {5 * ADV_FP_ONE, 0, 0};
@@ -404,7 +405,7 @@ static void test_wall_gameplay(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, test_wall_x, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, test_wall_x, 0, 0,0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5*ADV_FP_ONE,0,0};
     AdventureGame_SetSpawn(&game,spawn,0);
@@ -485,7 +486,7 @@ static void test_jump_head_hits_underside(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0};
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0,0};
     AdventureGame_SetTerrain(&game,terrain);
     AdventureVec3 spawn={5*ADV_FP_ONE,0,0};
     AdventureGame_SetSpawn(&game,spawn,0);
@@ -521,7 +522,7 @@ static void test_jump_from_upper_platform(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0};
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0,0};
     AdventureGame_SetTerrain(&game,terrain);
     AdventureVec3 spawn={5*ADV_FP_ONE,20*ADV_FP_ONE,0};
     AdventureGame_SetSpawn(&game,spawn,0);
@@ -546,7 +547,7 @@ static void test_unobstructed_jump_still_works(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain={test_world_ground,0,0,stack_overhead,0};
+    AdventureTerrain terrain={test_world_ground,0,0,stack_overhead,0,0};
     AdventureGame_SetTerrain(&game,terrain);
     /* Beyond x=40: no overhead. The ground fixture continues to 45. */
     AdventureVec3 spawn={42*ADV_FP_ONE,0,0};
@@ -564,7 +565,7 @@ static void test_head_bonk_determinism(void)
 {
     AdventureGame a,b;
     AdventureGame_Init(&a); AdventureGame_Init(&b);
-    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0};
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0,0};
     AdventureGame_SetTerrain(&a,terrain);
     AdventureGame_SetTerrain(&b,terrain);
     AdventureVec3 spawn={5*ADV_FP_ONE,0,0};
@@ -610,7 +611,7 @@ static bool thin_roof(void *ctx,int32_t x,int32_t z,int32_t lim,
 }
 static void test_diagonal_terrain_sweeps(void)
 {
-    AdventureTerrain t={thin_ground,0,0,thin_roof,0};
+    AdventureTerrain t={thin_ground,0,0,thin_roof,0,0};
     AdventureVerticalContact c;
     AdventureVec3 from={0,14*ADV_FP_ONE,ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,4*ADV_FP_ONE,ADV_FP_ONE};
@@ -635,7 +636,7 @@ static void test_diagonal_terrain_sweeps(void)
 }
 static void test_diagonal_sweep_no_false_contact(void)
 {
-    AdventureTerrain t={thin_ground,0,0,thin_roof,0};
+    AdventureTerrain t={thin_ground,0,0,thin_roof,0,0};
     AdventureVerticalContact c;
     AdventureVec3 from={0,14*ADV_FP_ONE,-2*ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,4*ADV_FP_ONE,-2*ADV_FP_ONE};
@@ -652,7 +653,7 @@ static void test_diagonal_sweep_no_false_contact(void)
 }
 static void test_diagonal_sweep_replay(void)
 {
-    AdventureTerrain t={thin_ground,0,0,thin_roof,0};
+    AdventureTerrain t={thin_ground,0,0,thin_roof,0,0};
     AdventureVerticalContact a,b;
     AdventureVec3 from={0,10*ADV_FP_ONE,ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,30*ADV_FP_ONE,ADV_FP_ONE};
@@ -709,7 +710,7 @@ static void test_game_tick_hits_narrow_roof(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain={roof_strip_ground,0,0,roof_strip_overhead,0};
+    AdventureTerrain terrain={roof_strip_ground,0,0,roof_strip_overhead,0,0};
     AdventureGame_SetTerrain(&game,terrain);
     AdventureVec3 spawn={4*ADV_FP_ONE+ADV_FP_ONE/2,
                          15*ADV_FP_ONE,0};
@@ -842,7 +843,7 @@ static void test_roof_in_vertical_gameplay(void)
     AdventureRoof_Clear(&mesh);
     AdventureRoofTriangle r=roof(8*ADV_FP_ONE,23);
     assert(AdventureRoof_Add(&mesh,r));
-    AdventureTerrain terrain={test_world_ground,&mesh,0,0,AdventureCapsule_SweepMesh};
+    AdventureTerrain terrain={test_world_ground,&mesh,0,0,AdventureCapsule_SweepMesh,0};
     AdventureGame game;
     AdventureGame_Init(&game);
     AdventureGame_SetTerrain(&game,terrain);
@@ -943,7 +944,7 @@ static void test_roof_sphere_game_tick_graze(void)
     AdventureRoof_Clear(&mesh);
     assert(AdventureRoof_Add(&mesh,roof(8*ADV_FP_ONE,406)));
     AdventureTerrain terrain={test_world_ground,&mesh,0,0,
-                              AdventureCapsule_SweepMesh};
+                              AdventureCapsule_SweepMesh,0};
     AdventureGame game;
     AdventureGame_Init(&game);
     AdventureGame_SetTerrain(&game,terrain);
@@ -1073,7 +1074,7 @@ static void test_capsule_standing_side_contact(void)
         {8*ADV_FP_ONE,2*ADV_FP_ONE,10*ADV_FP_ONE},530};
     assert(AdventureRoof_Add(&mesh,wall));
     AdventureTerrain terrain={test_world_ground,&mesh,0,0,
-                              AdventureCapsule_SweepMesh};
+                              AdventureCapsule_SweepMesh,0};
     AdventureGame game;
     AdventureGame_Init(&game);
     AdventureGame_SetTerrain(&game,terrain);
@@ -1246,8 +1247,7 @@ static void test_game_lands_and_stays_on_bin_roof(void)
     AdventureRoof_Clear(&mesh);
     assert(AdventureRoof_Add(&mesh,roof(20*ADV_FP_ONE,630)));
     AdventureTerrain terrain={
-        test_roof_and_ter_support,&mesh,0,0,AdventureCapsule_SweepMesh
-    };
+        test_roof_and_ter_support,&mesh,0,0,AdventureCapsule_SweepMesh,0};
     AdventureGame game;
     AdventureGame_Init(&game);
     AdventureGame_SetTerrain(&game,terrain);
@@ -1291,8 +1291,7 @@ static bool late_bin_wall(void *ctx,AdventureVec3 from,AdventureVec3 to,
 static void test_unified_solver_hit_order(void)
 {
     AdventureTerrain terrain={
-        test_world_ground,0,test_wall_x,0,test_slide_planes
-    };
+        test_world_ground,0,test_wall_x,0,test_slide_planes,0};
     AdventureSolver world={terrain,0};
     AdventureCapsuleHit hit;
     AdventureVec3 from={0,0,0};
@@ -1330,7 +1329,7 @@ static void test_unified_solver_hit_order(void)
 }
 static void test_unified_wall_then_floor_and_air_slide(void)
 {
-    AdventureTerrain terrain={test_world_ground,0,test_wall_x,0,0};
+    AdventureTerrain terrain={test_world_ground,0,test_wall_x,0,0,0};
     AdventureSolver world={terrain,0};
     AdventureVec3 from={5*ADV_FP_ONE,5*ADV_FP_ONE,1*ADV_FP_ONE};
     AdventureVec3 delta={10*ADV_FP_ONE,-10*ADV_FP_ONE,6*ADV_FP_ONE};
@@ -1359,7 +1358,7 @@ static void test_unified_wall_then_floor_and_air_slide(void)
 }
 static void test_unified_solver_replay(void)
 {
-    AdventureTerrain terrain={test_world_ground,0,test_wall_x,0,late_bin_wall};
+    AdventureTerrain terrain={test_world_ground,0,test_wall_x,0,late_bin_wall,0};
     AdventureSolver world={terrain,0};
     AdventureVec3 from={5*ADV_FP_ONE,8*ADV_FP_ONE,1*ADV_FP_ONE};
     AdventureVec3 delta={12*ADV_FP_ONE,-14*ADV_FP_ONE,6*ADV_FP_ONE};
@@ -1378,6 +1377,162 @@ static void test_unified_solver_replay(void)
         assert(r.touched_floor==first.touched_floor);
     }
 }
+
+/* Mock positive-up TER / BIN face normals, including a stacked steep
+ * surface that should NOT conceal an underlying walkable floor. */
+static bool test_slope_ground(void *ctx,int32_t x,int32_t z,
+                              int32_t maximum,AdventureGroundHit *out)
+{
+    (void)ctx; (void)z;
+    if(!out || x<0 || x>=40*ADV_FP_ONE) return false;
+    int32_t h;
+    int32_t id;
+    if(x<8*ADV_FP_ONE) {h=0;id=800;}
+    else if(x<20*ADV_FP_ONE) {
+        h=(x-8*ADV_FP_ONE)/2;id=801;
+    }else if(x<32*ADV_FP_ONE) {
+        h=6*ADV_FP_ONE+2*(x-20*ADV_FP_ONE);id=802;
+    }else {h=30*ADV_FP_ONE;id=803;}
+    if(h>maximum) return false;
+    out->height=h;out->surface_id=id;out->layer=0;
+    return true;
+}
+static bool test_slope_normal(void *ctx,int32_t x,int32_t z,
+                              int32_t id,AdventureVec3 *out)
+{
+    (void)ctx; (void)x; (void)z;
+    if(id==800 || id==803)
+        return AdventureSlope_Normalize(0,1,0,out);
+    if(id==801)
+        return AdventureSlope_Normalize(-1,2,0,out);
+    if(id==802)
+        return AdventureSlope_Normalize(-2,1,0,out);
+    return false;
+}
+static bool test_stacked_slope_ground(void *ctx,int32_t x,int32_t z,
+                                      int32_t maximum,AdventureGroundHit *out)
+{
+    (void)ctx; (void)x; (void)z;
+    if(!out) return false;
+    if(maximum>=20*ADV_FP_ONE) {
+        out->height=20*ADV_FP_ONE;out->surface_id=802;
+    }else if(maximum>=0) {
+        out->height=0;out->surface_id=800;
+    }else return false;
+    out->layer=0;
+    return true;
+}
+static void test_slope_normal_math_and_walkability(void)
+{
+    AdventureVec3 flat,shallow,steep;
+    assert(AdventureSlope_Normalize(0,-1,0,&flat));
+    assert(flat.y==ADV_FP_ONE && flat.x==0 && flat.z==0);
+    assert(AdventureSlope_Normalize(-1,2,0,&shallow));
+    assert(shallow.y>ADV_WALKABLE_NORMAL_Y);
+    assert(AdventureSlope_Walkable(shallow));
+    assert(AdventureSlope_Normalize(-2,1,0,&steep));
+    assert(steep.y<ADV_WALKABLE_NORMAL_Y);
+    assert(!AdventureSlope_Walkable(steep));
+    assert(!AdventureSlope_Normalize(0,0,0,&steep));
+    assert(!AdventureSlope_Normalize(100000001,1,0,&steep));
+    AdventureVec3 downhill=AdventureSlope_Downhill(steep);
+    /* The failed normalization must not be used; restore steep normal. */
+    assert(AdventureSlope_Normalize(-2,1,0,&steep));
+    downhill=AdventureSlope_Downhill(steep);
+    assert(downhill.x<0 && downhill.z==0);
+    assert(AdventureSlope_Downhill(shallow).x==0);
+}
+static void test_slope_support_and_stacked_selection(void)
+{
+    AdventureTerrain terrain={
+        test_stacked_slope_ground,0,0,0,0,test_slope_normal
+    };
+    AdventureGroundHit hit;
+    AdventureVec3 normal;
+    assert(AdventureSlope_QuerySupport(terrain,0,0,
+                                      25*ADV_FP_ONE,&hit,&normal));
+    assert(hit.height==0 && hit.surface_id==800);
+    assert(normal.y==ADV_FP_ONE);
+    assert(!AdventureSlope_QuerySupport(terrain,0,0,-ADV_FP_ONE,
+                                       &hit,&normal));
+    terrain.query_normal=0; /* old provider compatibility */
+    assert(AdventureSlope_QuerySupport(terrain,0,0,
+                                      25*ADV_FP_ONE,&hit,&normal));
+    assert(hit.height==20*ADV_FP_ONE);
+    assert(normal.y==ADV_FP_ONE);
+
+    /* Fail-safe against a broken query that never lowers its candidate. */
+    terrain.query_ground=test_slope_ground;
+    terrain.query_normal=test_slope_normal;
+    assert(AdventureSlope_QuerySupport(terrain,9*ADV_FP_ONE,0,
+                                      2*ADV_FP_ONE,&hit,&normal));
+    assert(hit.surface_id==801);
+    assert(normal.y>ADV_WALKABLE_NORMAL_Y);
+    assert(!AdventureSlope_QuerySupport(terrain,22*ADV_FP_ONE,0,
+                                       20*ADV_FP_ONE,&hit,&normal));
+}
+static void test_slope_gameplay_transition(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain={
+        test_slope_ground,0,0,0,0,test_slope_normal
+    };
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureGame_SetSpawn(&game,(AdventureVec3){8*ADV_FP_ONE,0,0},0);
+    assert(game.player.grounded);
+    AdventureRawInput raw={0};
+    raw.move_y=32767;
+    bool climbed=false,steep_rejected=false;
+    for(int i=0;i<50;i++){
+        assert(AdventureGame_Tick(&game,raw,kEast));
+        if(game.player.grounded && game.player.surface_id==801){
+            climbed=true;
+            assert(game.player.ground_normal.y>ADV_WALKABLE_NORMAL_Y);
+        }
+        if(climbed && !game.player.grounded){
+            steep_rejected=true;
+            break;
+        }
+    }
+    assert(climbed && steep_rejected);
+    assert(game.player.ground_normal.y==ADV_FP_ONE);
+    /* Respawning directly on the steep slope must never mark grounded. */
+    AdventureGame_SetSpawn(&game,(AdventureVec3){
+        25*ADV_FP_ONE,16*ADV_FP_ONE,0},0);
+    assert(!game.player.grounded);
+    /* A flat upper platform remains valid when spawned independently. */
+    AdventureGame_SetSpawn(&game,(AdventureVec3){
+        34*ADV_FP_ONE,30*ADV_FP_ONE,0},0);
+    assert(game.player.grounded);
+    assert(game.player.surface_id==803);
+}
+static void test_bin_roof_normal_selection(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    AdventureRoofTriangle moderate={
+        {0,10*ADV_FP_ONE,0},
+        {8*ADV_FP_ONE,14*ADV_FP_ONE,0},
+        {0,10*ADV_FP_ONE,8*ADV_FP_ONE},850
+    };
+    assert(AdventureRoof_Add(&mesh,moderate));
+    AdventureVec3 n;
+    assert(AdventureRoof_QueryNormal(&mesh,850,&n));
+    assert(n.y>ADV_WALKABLE_NORMAL_Y);
+    assert(n.x<0);
+    assert(!AdventureRoof_QueryNormal(&mesh,999,&n));
+
+    AdventureRoofTriangle too_steep={
+        {0,20*ADV_FP_ONE,0},
+        {8*ADV_FP_ONE,28*ADV_FP_ONE,0},
+        {0,20*ADV_FP_ONE,8*ADV_FP_ONE},851
+    };
+    assert(AdventureRoof_Add(&mesh,too_steep));
+    assert(AdventureRoof_QueryNormal(&mesh,851,&n));
+    assert(!AdventureSlope_Walkable(n));
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -1424,5 +1579,9 @@ int main(void)
     test_unified_solver_hit_order();
     test_unified_wall_then_floor_and_air_slide();
     test_unified_solver_replay();
+    test_slope_normal_math_and_walkability();
+    test_slope_support_and_stacked_selection();
+    test_slope_gameplay_transition();
+    test_bin_roof_normal_selection();
     return 0;
 }

@@ -20,6 +20,11 @@ typedef bool (*AdventureGroundQuery)(void *context, int32_t x, int32_t z,
  * This is an explicit two-sided platformer policy, not a legacy race rule. */
 typedef bool (*AdventureOverheadQuery)(void *context, int32_t x, int32_t z,
                                         int32_t min_height, AdventureGroundHit *out);
+/* Optional surface-normal lookup. Returns canonical positive-up Q12 vector
+ * for the surface ID chosen by the ground query at this exact X/Z. */
+typedef bool (*AdventureGroundNormalQuery)(void *context, int32_t x,
+                                           int32_t z, int32_t surface_id,
+                                           AdventureVec3 *out);
 typedef struct AdventureTerrain {
     AdventureGroundQuery query_ground;
     void *context;
@@ -28,5 +33,6 @@ typedef struct AdventureTerrain {
     /* Optional full-body vertical capsule cast against explicitly authored
      * static BIN roof triangles. The terrain.context is passed unchanged. */
     AdventureCapsuleQuery sweep_capsule;
+    AdventureGroundNormalQuery query_normal; /* optional, defaults to up */
 } AdventureTerrain;
 #endif

@@ -4,6 +4,7 @@
  * Decorative BIN faces are never considered. No heap, no floating point.
  */
 #include "adventure_roof.h"
+#include "adventure_slope.h"
 #include <stdint.h>
 #include <limits.h>
 
@@ -75,4 +76,25 @@ bool AdventureRoof_QueryGround(void *context,int32_t x,int32_t z,
     }
     if(found) {*height=best;*triangle_id=id;}
     return found;
+}
+
+bool AdventureRoof_QueryNormal(void *context,int32_t triangle_id,
+                                AdventureVec3 *out)
+{
+    const AdventureRoofMesh *mesh=(const AdventureRoofMesh *)context;
+    if(!mesh || !out) return false;
+    for(uint16_t i=0;i<mesh->count;i++){
+        const AdventureRoofTriangle *t=&mesh->triangles[i];
+        if(t->id!=triangle_id) continue;
+        int64_t ux=((int64_t)t->b.x-t->a.x)/ADV_FP_ONE;
+        int64_t uy=((int64_t)t->b.y-t->a.y)/ADV_FP_ONE;
+        int64_t uz=((int64_t)t->b.z-t->a.z)/ADV_FP_ONE;
+        int64_t vx=((int64_t)t->c.x-t->a.x)/ADV_FP_ONE;
+        int64_t vy=((int64_t)t->c.y-t->a.y)/ADV_FP_ONE;
+        int64_t vz=((int64_t)t->c.z-t->a.z)/ADV_FP_ONE;
+        return AdventureSlope_Normalize(uy*vz-uz*vy,
+                                         uz*vx-ux*vz,
+                                         ux*vy-uy*vx,out);
+    }
+    return false;
 }

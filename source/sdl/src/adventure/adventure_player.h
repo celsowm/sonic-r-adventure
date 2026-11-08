@@ -13,6 +13,7 @@ typedef struct AdventurePlayer {
     AdventureVec3 pos;
     AdventureVec3 previous_pos;
     AdventureVec3 velocity;       /* Q20.12 per 60Hz tick */
+    AdventureVec3 ground_normal;  /* Q12 positive-up support normal */
     uint16_t facing;
     AdventureMotion motion;
     int32_t surface_id;           /* -1 = no support */

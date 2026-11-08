@@ -6,6 +6,7 @@
  */
 #include "adventure_terrain_legacy.h"
 #include "adventure_math.h"
+#include "adventure_slope.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "ter_types.h"
@@ -87,4 +88,26 @@ bool AdventureTerrain_QueryLegacyOverhead(void *context, int32_t x, int32_t z,
 {
     (void)context;
     return query_ter_height(x, z, min_height, true, out);
+}
+
+/* Re-evaluate polygon footprint before reading s_hitEdgeIdx: this scratch
+ * index belongs to PointInPolygon and may have changed since ground query. */
+bool AdventureTerrain_QueryLegacyNormal(void *context,int32_t x,int32_t z,
+                                        int32_t surface_id,AdventureVec3 *out)
+{
+    (void)context;
+    if(!out || surface_id<0 || !g_trackSurfaceData ||
+       !g_terFaceTable || !g_terVertexTable) return false;
+    const TerSurface *surfaces=(const TerSurface *)g_trackSurfaceData;
+    const TerSurface *surface=&surfaces[surface_id];
+    if(surface->faceCount<=0 || surface->faceBase<0 ||
+       !PointInPolygon(x,z,surface_id)) return false;
+    int edge=s_hitEdgeIdx;
+    if(edge<0 || edge>=surface->faceCount) return false;
+    const TerFace *faces=(const TerFace *)g_terFaceTable;
+    const TerFace *face=&faces[surface->faceBase+edge];
+    /* Legacy .TER uses negative-up for Y. The X/Z axes are unchanged. */
+    return AdventureSlope_Normalize(face->normalX,
+                                     -(int64_t)face->normalY,
+                                     face->normalZ,out);
 }

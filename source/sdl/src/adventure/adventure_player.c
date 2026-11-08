@@ -7,6 +7,7 @@
 #include "adventure_player.h"
 #include "adventure_vertical.h"
 #include "adventure_solver.h"
+#include "adventure_slope.h"
 #include <stdint.h>
 #define ADV_MAX_SPEED_Q12 (3 * ADV_FP_ONE)
 #define ADV_ACCEL_Q12 900
@@ -28,6 +29,7 @@ void AdventurePlayer_Init(AdventurePlayer *p, AdventureVec3 pos, uint16_t facing
     p->pos = pos;
     p->previous_pos = pos;
     p->velocity.x = p->velocity.y = p->velocity.z = 0;
+    p->ground_normal=(AdventureVec3){0,ADV_FP_ONE,0};
     p->facing = facing & 4095u;
     p->motion = ADV_MOTION_IDLE;
     p->surface_id = -1;
@@ -86,8 +88,11 @@ void AdventurePlayer_ResolveSpawn(AdventurePlayer *p, AdventureTerrain terrain)
     if (!p) return;
     AdventureGroundHit hit;
     int32_t upper = AdventureMath_ClampI32((int64_t)p->pos.y + ADV_STEP_UP);
-    if (query(terrain, p->pos.x, p->pos.z, upper, &hit) &&
+    AdventureVec3 normal;
+    if (AdventureSlope_QuerySupport(terrain,p->pos.x,p->pos.z,
+                                    upper,&hit,&normal) &&
         hit.height >= AdventureMath_ClampI32((int64_t)p->pos.y - ADV_GROUND_SNAP)) {
+        p->ground_normal=normal;
         p->pos.y = hit.height;
         p->previous_pos.y = hit.height;
         p->grounded = 1;
@@ -124,7 +129,22 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
         int32_t bottom=AdventureMath_ClampI32(
             (int64_t)p->pos.y-ADV_GROUND_SNAP);
         AdventureGroundHit ahead;
-        if (!query(terrain,tx,tz,top,&ahead) || ahead.height<bottom) {
+        AdventureVec3 normal;
+        if(!AdventureSlope_QuerySupport(terrain,tx,tz,top,&ahead,&normal) ||
+           ahead.height<bottom) {
+            /* Steep terrain is a physical obstruction but NOT a support.
+             * Bias the airborne motion slightly downhill so Sonic cannot
+             * stick indefinitely to an unwalkable slope face. */
+            AdventureGroundHit steep;
+            if(query(terrain,tx,tz,top,&steep) && steep.height>=bottom) {
+                AdventureVec3 n=AdventureSlope_Normal(terrain,tx,tz,
+                                                      steep.surface_id);
+                AdventureVec3 bias=AdventureSlope_Downhill(n);
+                p->velocity.x=AdventureMath_ClampI32(
+                    (int64_t)p->velocity.x+bias.x);
+                p->velocity.z=AdventureMath_ClampI32(
+                    (int64_t)p->velocity.z+bias.z);
+            }
             p->grounded=0;
             p->surface_id=-1;
             p->coyote_ticks=ADV_COYOTE_TICKS;
@@ -169,8 +189,10 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
     int32_t lower=AdventureMath_ClampI32(
         (int64_t)p->pos.y-ADV_GROUND_SNAP);
     AdventureGroundHit support;
-    bool has_support=query(terrain,p->pos.x,p->pos.z,upper,&support) &&
-                     support.height>=lower;
+    AdventureVec3 support_normal;
+    bool has_support=AdventureSlope_QuerySupport(
+        terrain,p->pos.x,p->pos.z,upper,&support,&support_normal) &&
+        support.height>=lower;
     if(!jumped && has_support &&
        (was_grounded || result.touched_floor)) {
         p->pos.y=support.height;
@@ -178,12 +200,14 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
         p->velocity.y=0;
         p->surface_id=support.surface_id;
         p->surface_layer=support.layer;
+        p->ground_normal=support_normal;
         p->coyote_ticks=ADV_COYOTE_TICKS;
     }else{
         if(was_grounded && p->grounded && !has_support)
             p->coyote_ticks=ADV_COYOTE_TICKS;
         p->grounded=0;
         p->surface_id=-1;
+        p->ground_normal=(AdventureVec3){0,ADV_FP_ONE,0};
     }
 
     if(p->grounded)

@@ -6,6 +6,10 @@ bool AdventureTerrain_QueryLegacy(void *context, int32_t x, int32_t z,
                                    int32_t max_height, AdventureGroundHit *out);
 /* Find the nearest .TER floor above a head-height threshold (two-sided
  * elevated platforms). Shares the terrain traversal with ground sampling. */
+/* Read normal from the original face containing X/Z. Y is flipped from
+ * legacy negative-up into adventure positive-up before normalization. */
+bool AdventureTerrain_QueryLegacyNormal(void *context,int32_t x,int32_t z,
+                                        int32_t surface_id,AdventureVec3 *out);
 bool AdventureTerrain_QueryLegacyOverhead(void *context, int32_t x, int32_t z,
                                           int32_t min_height, AdventureGroundHit *out);
 /* Query native wall polylines using the same grid; does not mutate racing
