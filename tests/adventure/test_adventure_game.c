@@ -951,7 +951,11 @@ static void test_roof_sphere_game_tick_graze(void)
     raw.buttons=ADV_ACTION_JUMP;
     assert(AdventureGame_Tick(&game,raw,kEast));
     assert(!game.player.grounded);
-    assert(game.player.velocity.y==0);
+    /* Unlike a face-on ceiling collision, a lateral roof-edge graze leaves
+     * a nonzero upward tangent. The new slide must REMOVE the normal
+     * component without cancelling the entire jump velocity. */
+    assert(game.player.velocity.y>0);
+    assert(game.player.velocity.y<6*ADV_FP_ONE);
     /* Edge z=-0.5 intersects the unit head sphere at head-center
      * Y=8-sqrt(1-0.5^2) ~= 7.134, hence footY ~= 4.134 minus skin.
      * This is later/higher than direct center-plane contact at footY=4. */
