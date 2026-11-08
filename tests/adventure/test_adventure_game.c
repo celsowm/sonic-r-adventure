@@ -6,6 +6,7 @@
 #include "../../source/sdl/src/adventure/adventure_solver.h"
 #include "../../source/sdl/src/adventure/adventure_slope.h"
 #include "../../source/sdl/src/adventure/adventure_traction.h"
+#include "../../source/sdl/src/adventure/adventure_camera.h"
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
@@ -1662,6 +1663,155 @@ static void test_traction_deterministic_replay(void)
     }
 }
 
+
+/* WP-05.1 action camera: independent fixed-point state / renderer bridge.
+ * Mock wall plane at X=-6 to test conservative camera compression. */
+static bool camera_test_wall(void *ctx,AdventureVec3 target,
+                             AdventureVec3 eye,int32_t layer,
+                             uint16_t *fraction)
+{
+    (void)ctx;(void)layer;
+    int64_t plane=-6*ADV_FP_ONE;
+    if(!fraction || target.x<=plane || eye.x>=plane)
+        return false;
+    int64_t d=(int64_t)target.x-eye.x;
+    if(d<=0) return false;
+    *fraction=(uint16_t)(((int64_t)target.x-plane)*ADV_FP_ONE/d);
+    return true;
+}
+static void test_action_camera_spawn_basis(void)
+{
+    AdventurePlayer player;
+    AdventurePlayer_Init(&player,(AdventureVec3){0,0,0},0);
+    AdventureCamera cam={0};
+    AdventureCamera_Reset(&cam,&player);
+    assert(cam.initialized);
+    assert(cam.yaw==0);
+    assert(cam.position.x==-ADV_CAMERA_DISTANCE);
+    assert(cam.position.y==ADV_CAMERA_LOOK_HEIGHT+ADV_CAMERA_HEIGHT);
+    assert(cam.look_at.x==0 && cam.look_at.z==0);
+    AdventureBasis b=AdventureCamera_MovementBasis(&cam);
+    assert(b.forward_x==ADV_FP_ONE && b.forward_z==0);
+    assert(b.right_x==0 && b.right_z==ADV_FP_ONE);
+    /* Quarter-turn basis must follow +Z with a perpendicular right axis. */
+    player.facing=1024;
+    AdventureCamera_Reset(&cam,&player);
+    b=AdventureCamera_MovementBasis(&cam);
+    assert(b.forward_x==0 && b.forward_z==ADV_FP_ONE);
+    assert(b.right_x==-ADV_FP_ONE && b.right_z==0);
+    assert(cam.position.z==-ADV_CAMERA_DISTANCE);
+}
+static void test_action_camera_orbit_and_wrap(void)
+{
+    AdventurePlayer player;
+    AdventurePlayer_Init(&player,(AdventureVec3){0,0,0},4080);
+    AdventureCamera cam={0};
+    AdventureCamera_Reset(&cam,&player);
+    player.facing=16; /* shortest way across zero is +32, not -4064 */
+    AdventureCamera_Tick(&cam,&player,0,0,0);
+    assert(cam.yaw<64); /* wrapped smoothly */
+    uint16_t previous=cam.yaw;
+    for(int i=0;i<16;i++)
+        AdventureCamera_Tick(&cam,&player,ADV_ACTION_CAMERA_RIGHT,0,0);
+    assert(cam.orbit_offset>0 && cam.orbit_offset<=1280);
+    assert(cam.yaw!=previous);
+    uint16_t manually_rotated=cam.yaw;
+    for(int i=0;i<160;i++)
+        AdventureCamera_Tick(&cam,&player,0,0,0);
+    assert(cam.orbit_offset==0);
+    assert(cam.yaw!=manually_rotated);
+    assert((uint16_t)((cam.yaw-player.facing)&4095u)<16u);
+    for(int i=0;i<200;i++)
+        AdventureCamera_Tick(&cam,&player,ADV_ACTION_CAMERA_LEFT,0,0);
+    assert(cam.orbit_offset==-1280);
+}
+static void test_action_camera_follow_and_lookahead(void)
+{
+    AdventurePlayer player;
+    AdventurePlayer_Init(&player,(AdventureVec3){0,0,0},0);
+    AdventureCamera cam={0};
+    AdventureCamera_Reset(&cam,&player);
+    AdventureVec3 start=cam.position;
+    player.pos.x=20*ADV_FP_ONE;
+    player.pos.y=6*ADV_FP_ONE;
+    player.velocity.x=3*ADV_FP_ONE;
+    AdventureCamera_Tick(&cam,&player,0,0,0);
+    assert(cam.position.x>start.x);
+    assert(cam.position.x<player.pos.x);
+    assert(cam.look_at.x>0);
+    assert(cam.look_at.y>ADV_CAMERA_LOOK_HEIGHT);
+    assert(cam.look_at.x<player.pos.x+4*ADV_FP_ONE);
+    for(int i=0;i<40;i++)
+        AdventureCamera_Tick(&cam,&player,0,0,0);
+    assert(cam.look_at.x>player.pos.x);
+    assert(cam.distance==ADV_CAMERA_DISTANCE);
+}
+static void test_action_camera_obstruction_and_recovery(void)
+{
+    AdventurePlayer player;
+    AdventurePlayer_Init(&player,(AdventureVec3){0,0,0},0);
+    AdventureCamera cam={0};
+    AdventureCamera_Reset(&cam,&player);
+    assert(cam.position.x<-6*ADV_FP_ONE);
+    AdventureCamera_Tick(&cam,&player,0,camera_test_wall,0);
+    assert(cam.distance<ADV_CAMERA_DISTANCE);
+    assert(cam.distance>=ADV_CAMERA_MIN_DISTANCE);
+    assert(cam.position.x>-6*ADV_FP_ONE);
+    int32_t shortened=cam.distance;
+    AdventureCamera_Tick(&cam,&player,0,0,0);
+    assert(cam.distance>shortened);
+    assert(cam.distance<ADV_CAMERA_DISTANCE);
+    for(int i=0;i<70;i++)
+        AdventureCamera_Tick(&cam,&player,0,0,0);
+    assert(cam.distance==ADV_CAMERA_DISTANCE);
+    assert(cam.position.x<-6*ADV_FP_ONE);
+}
+static void test_action_camera_teleport_and_zero_input(void)
+{
+    AdventurePlayer player;
+    AdventurePlayer_Init(&player,(AdventureVec3){0,0,0},0);
+    AdventureCamera cam={0};
+    AdventureCamera_Tick(&cam,&player,0,0,0); /* implicit initialization */
+    assert(cam.initialized);
+    player.pos=(AdventureVec3){250*ADV_FP_ONE,80*ADV_FP_ONE,
+                                -60*ADV_FP_ONE};
+    player.facing=1024;
+    AdventureCamera_Tick(&cam,&player,0,0,0);
+    assert(cam.look_at.x==player.pos.x);
+    assert(cam.look_at.y==player.pos.y+ADV_CAMERA_LOOK_HEIGHT);
+    assert(cam.yaw==1024);
+    assert(cam.position.z<player.pos.z);
+    assert(cam.position.x==player.pos.x);
+}
+static void test_action_camera_deterministic_replay(void)
+{
+    AdventurePlayer player;
+    AdventurePlayer_Init(&player,(AdventureVec3){0,0,0},0);
+    AdventureCamera a={0},b={0};
+    AdventureCamera_Reset(&a,&player);
+    AdventureCamera_Reset(&b,&player);
+    for(int i=0;i<350;i++){
+        player.pos.x+=ADV_FP_ONE/2;
+        player.pos.z+=(i%9==0)?ADV_FP_ONE/4:0;
+        player.pos.y+=(i%24<12)?ADV_FP_ONE/8:-ADV_FP_ONE/8;
+        player.velocity.x=ADV_FP_ONE/2;
+        player.velocity.z=(i%9==0)?ADV_FP_ONE/4:0;
+        player.facing=(uint16_t)((i*13)&4095);
+        uint32_t buttons=(i%100<14)?ADV_ACTION_CAMERA_LEFT:
+                         ((i%100>85)?ADV_ACTION_CAMERA_RIGHT:0u);
+        AdventureCamera_Tick(&a,&player,buttons,camera_test_wall,0);
+        AdventureCamera_Tick(&b,&player,buttons,camera_test_wall,0);
+        assert(a.position.x==b.position.x);
+        assert(a.position.y==b.position.y);
+        assert(a.position.z==b.position.z);
+        assert(a.look_at.x==b.look_at.x);
+        assert(a.look_at.y==b.look_at.y);
+        assert(a.look_at.z==b.look_at.z);
+        assert(a.yaw==b.yaw && a.orbit_offset==b.orbit_offset);
+        assert(a.distance==b.distance);
+    }
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -1717,5 +1867,11 @@ int main(void)
     test_traction_air_carry_and_direction();
     test_game_slope_roll_and_ledge_momentum();
     test_traction_deterministic_replay();
+    test_action_camera_spawn_basis();
+    test_action_camera_orbit_and_wrap();
+    test_action_camera_follow_and_lookahead();
+    test_action_camera_obstruction_and_recovery();
+    test_action_camera_teleport_and_zero_input();
+    test_action_camera_deterministic_replay();
     return 0;
 }

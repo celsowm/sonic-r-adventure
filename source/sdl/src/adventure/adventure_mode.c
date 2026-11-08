@@ -13,6 +13,8 @@
 #include "adventure_mode.h"
 #include "adventure_game.h"
 #include "adventure_math.h"
+#include "adventure_camera.h"
+#include "adventure_camera_legacy.h"
 #include "adventure_terrain_legacy.h"
 #include "adventure_roof.h"
 #include "adventure_roof_legacy.h"
@@ -24,8 +26,6 @@
 
 #include <stdint.h>
 
-extern void BuildChaseCamera(Player *player, CamStateEntry *cam);
-extern void BuildCameraViewForViewport(int vp);
 extern void FlipD3D(void);
 extern unsigned char s_keystate[256];
 
@@ -96,10 +96,11 @@ int AdventureMode_RunPreview(void)
     g_skipThisFrame = 0;
     g_renderPass = 2;
 
-    /* Camera bootstraps from InitLevel's original track/camera resources.
-     * A dedicated action camera replaces this in WP-05. */
-    g_camStateTable[0].fovDetail = 0x20;
-    BuildChaseCamera(&g_playerBase[0], &g_camStateTable[0]);
+    /* The action camera owns its own fixed-tick simulation state; it does
+     * not inherit the race camera's smoothing, follow distance or flyover. */
+    AdventureCamera camera={0};
+    AdventureCamera_Reset(&camera,&game.player);
+    AdventureCameraLegacy_Apply(&camera);
 
     s_adventure_active = 1;
 
@@ -135,16 +136,12 @@ int AdventureMode_RunPreview(void)
         tick_accum += elapsed_ms * 60u;
         unsigned int ticks = 0;
         while (tick_accum >= 1000u && ticks < 4u) {
-            /* Camera coordinates use 1/16 world units, player uses Q20.12.
-             * Derive the movement reference from camera position, not from
-             * ambiguously named legacy targetYaw/targetPitch fields. */
-            int32_t cam_x = AdventureMath_ClampI32(
-                (int64_t)g_camStateTable[0].posX * 256);
-            int32_t cam_z = AdventureMath_ClampI32(
-                (int64_t)g_camStateTable[0].posZ * 256);
-            AdventureBasis basis = AdventureMath_CameraBasis(
-                game.player.pos.x, game.player.pos.z, cam_x, cam_z);
+            /* Camera basis and movement both update on fixed simulation
+             * ticks; rendering never advances the camera twice per frame. */
+            AdventureBasis basis=AdventureCamera_MovementBasis(&camera);
             (void)AdventureGame_Tick(&game, controls, basis);
+            AdventureCamera_Tick(&camera,&game.player,controls.buttons,
+                                 AdventureCameraLegacy_Trace,&terrain);
             tick_accum -= 1000u;
             ++ticks;
         }
@@ -153,10 +150,9 @@ int AdventureMode_RunPreview(void)
         g_currentTime = frame_start_ms;
         AdventureMode_ApplyPlayer(&game.player);
         g_playerBase[0].renderEnabled = 1;
-        /* Temporary chase camera is updated after position integration.
-         * WP-05 replaces this renderer-facing compatibility bridge. */
-        BuildChaseCamera(&g_playerBase[0], &g_camStateTable[0]);
-        BuildCameraViewForViewport(0);
+        /* View matrix updates from the action camera only; the legacy race
+         * camera would otherwise override it every render frame. */
+        AdventureCameraLegacy_Apply(&camera);
         RenderHUD();
         FlipD3D();
         ++g_totalFrames;
