@@ -7,6 +7,7 @@ void AdventureGame_Init(AdventureGame *game)
     game->tick_count = 0;
     game->terrain.query_ground = 0;
     game->terrain.context = 0;
+    game->terrain.sweep_wall = 0;
     AdventureInput_Reset(&game->input_history);
     AdventureVec3 origin = {0, 0, 0};
     AdventurePlayer_Init(&game->player, origin, 0);

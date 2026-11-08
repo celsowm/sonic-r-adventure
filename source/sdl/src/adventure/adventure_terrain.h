@@ -3,6 +3,7 @@
 #define SONICR_ADVENTURE_TERRAIN_H
 #include <stdbool.h>
 #include <stdint.h>
+#include "adventure_collision.h"
 typedef struct AdventureGroundHit {
     int32_t height;        /* top surface Y, Q20.12 */
     int32_t surface_id;
@@ -15,5 +16,6 @@ typedef bool (*AdventureGroundQuery)(void *context, int32_t x, int32_t z,
 typedef struct AdventureTerrain {
     AdventureGroundQuery query_ground;
     void *context;
+    AdventureWallQuery sweep_wall; /* optional collision against static obstacles */
 } AdventureTerrain;
 #endif

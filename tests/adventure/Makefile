@@ -4,9 +4,11 @@ ROOT = ../..
 GAME = $(ROOT)/source/sdl/src/adventure
 
 GAME_SOURCES = $(GAME)/adventure_game.c $(GAME)/adventure_input.c \
-               $(GAME)/adventure_math.c $(GAME)/adventure_player.c
+               $(GAME)/adventure_math.c $(GAME)/adventure_player.c \
+               $(GAME)/adventure_collision.c
 GAME_HEADERS = $(GAME)/adventure_game.h $(GAME)/adventure_input.h \
-               $(GAME)/adventure_math.h $(GAME)/adventure_player.h
+               $(GAME)/adventure_math.h $(GAME)/adventure_player.h \
+               $(GAME)/adventure_collision.h $(GAME)/adventure_terrain.h
 
 .PHONY: test clean
 test: test_adventure_game

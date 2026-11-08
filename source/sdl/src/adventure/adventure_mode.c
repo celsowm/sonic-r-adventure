@@ -57,7 +57,7 @@ int AdventureMode_RunPreview(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, 0};
+    AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, 0, AdventureTerrain_SweepLegacyWall};
     AdventureGame_SetTerrain(&game, terrain);
 
     /* InitLevel already populated the original game resources and Player[0].

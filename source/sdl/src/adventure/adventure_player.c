@@ -16,6 +16,8 @@
 #define ADV_TERMINAL (14 * ADV_FP_ONE)
 #define ADV_COYOTE_TICKS 5
 #define ADV_JUMP_BUFFER_TICKS 6
+#define ADV_CAPSULE_RADIUS (ADV_FP_ONE)
+#define ADV_CAPSULE_HEIGHT (4 * ADV_FP_ONE)
 
 void AdventurePlayer_Init(AdventurePlayer *p, AdventureVec3 pos, uint16_t facing)
 {
@@ -54,8 +56,6 @@ static void AdventurePlayer_Horizontal(AdventurePlayer *p, AdventureInput input,
         p->velocity.x = (int32_t)(vx * ADV_MAX_SPEED_Q12 / speed);
         p->velocity.z = (int32_t)(vz * ADV_MAX_SPEED_Q12 / speed);
     }
-    p->pos.x = AdventureMath_ClampI32((int64_t)p->pos.x + p->velocity.x);
-    p->pos.z = AdventureMath_ClampI32((int64_t)p->pos.z + p->velocity.z);
     if (p->velocity.x > ADV_FACE_THRESHOLD || p->velocity.x < -ADV_FACE_THRESHOLD ||
         p->velocity.z > ADV_FACE_THRESHOLD || p->velocity.z < -ADV_FACE_THRESHOLD)
         p->facing = AdventureMath_HeadingXZ(p->velocity.x, p->velocity.z);
@@ -66,6 +66,8 @@ void AdventurePlayer_TickGroundPilot(AdventurePlayer *p, AdventureInput input,
     if (!p) return;
     p->previous_pos = p->pos;
     AdventurePlayer_Horizontal(p, input, basis);
+    p->pos.x = AdventureMath_ClampI32((int64_t)p->pos.x + p->velocity.x);
+    p->pos.z = AdventureMath_ClampI32((int64_t)p->pos.z + p->velocity.z);
     p->velocity.y = 0;
     p->motion = (p->velocity.x || p->velocity.z) ?
                 ADV_MOTION_MOVING : ADV_MOTION_IDLE;
@@ -97,6 +99,10 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
     if (!p) return;
     p->previous_pos = p->pos;
     AdventurePlayer_Horizontal(p, input, basis);
+    AdventureCollision_MoveAndSlide(&p->pos, &p->velocity,
+                                    terrain.sweep_wall, terrain.context,
+                                    ADV_CAPSULE_RADIUS, ADV_CAPSULE_HEIGHT,
+                                    p->surface_layer);
 
     if (input.pressed & ADV_ACTION_JUMP) p->buffered_jump = ADV_JUMP_BUFFER_TICKS;
     else if (p->buffered_jump) --p->buffered_jump;

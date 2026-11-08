@@ -173,7 +173,7 @@ static void test_world_spawn_and_ramp(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, spawn, 0);
@@ -192,7 +192,7 @@ static void test_jump_and_landing(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, spawn, 0);
@@ -222,7 +222,7 @@ static void test_stacked_floor_and_ledge(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 lower = {35 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, lower, 0);
@@ -251,7 +251,7 @@ static void test_world_replay(void)
     AdventureGame a, b;
     AdventureGame_Init(&a);
     AdventureGame_Init(&b);
-    AdventureTerrain terrain = {test_world_ground, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0};
     AdventureGame_SetTerrain(&a, terrain);
     AdventureGame_SetTerrain(&b, terrain);
     AdventureVec3 start = {5 * ADV_FP_ONE, 0, 0};
@@ -272,6 +272,104 @@ static void test_world_replay(void)
     }
 }
 
+
+/* Synthetic vertical walls for collision tests: x = 10, z = 10. */
+static bool test_wall_x(void *context, AdventureVec3 from, AdventureVec3 to,
+                        int32_t radius, int32_t height, int32_t layer,
+                        AdventureWallHit *out)
+{
+    (void)context;
+    (void)height;
+    (void)layer;
+    AdventureVec3 a = {10*ADV_FP_ONE,0,-20*ADV_FP_ONE};
+    AdventureVec3 b = {10*ADV_FP_ONE,0, 20*ADV_FP_ONE};
+    return AdventureCollision_SweepDiscSegment(from,to,a,b,radius,out);
+}
+static bool test_wall_corner(void *context, AdventureVec3 from, AdventureVec3 to,
+                             int32_t radius, int32_t height, int32_t layer,
+                             AdventureWallHit *out)
+{
+    AdventureWallHit x, z;
+    bool hit_x = test_wall_x(context, from, to, radius, height, layer, &x);
+    AdventureVec3 a = {-20*ADV_FP_ONE,0,10*ADV_FP_ONE};
+    AdventureVec3 b = {20*ADV_FP_ONE,0,10*ADV_FP_ONE};
+    bool hit_z = AdventureCollision_SweepDiscSegment(from,to,a,b,radius,&z);
+    if (!hit_x && !hit_z) return false;
+    *out = (!hit_x || (hit_z && z.fraction < x.fraction)) ? z : x;
+    return true;
+}
+static void test_segment_sweeps(void)
+{
+    AdventureVec3 from = {0,0,0};
+    AdventureVec3 to = {20*ADV_FP_ONE,0,0};
+    AdventureVec3 a = {10*ADV_FP_ONE,0,-20*ADV_FP_ONE};
+    AdventureVec3 b = {10*ADV_FP_ONE,0, 20*ADV_FP_ONE};
+    AdventureWallHit hit;
+    assert(AdventureCollision_SweepDiscSegment(from,to,a,b,
+                                                ADV_FP_ONE,&hit));
+    assert(hit.fraction > 1700 && hit.fraction < 1950);
+    assert(hit.normal_x < -3500);
+    assert(hit.normal_z > -100 && hit.normal_z < 100);
+    /* Crossing the wall backwards also blocks movement, with flipped normal. */
+    assert(AdventureCollision_SweepDiscSegment(to,from,a,b,
+                                                ADV_FP_ONE,&hit));
+    assert(hit.normal_x > 3500);
+    /* Moving away from a touching wall is allowed, with no sticky contact. */
+    from.x = 9*ADV_FP_ONE;
+    to.x = 0;
+    assert(!AdventureCollision_SweepDiscSegment(from,to,a,b,
+                                                 ADV_FP_ONE,&hit));
+    /* Near a segment endpoint, a miss cannot become an infinite-line hit. */
+    a.z = 5*ADV_FP_ONE;
+    b.z = 15*ADV_FP_ONE;
+    from.x = 0;
+    to.x = 20*ADV_FP_ONE;
+    assert(!AdventureCollision_SweepDiscSegment(from,to,a,b,
+                                                 ADV_FP_ONE,&hit));
+}
+static void test_wall_sliding(void)
+{
+    AdventureVec3 position = {0,0,0};
+    AdventureVec3 velocity = {20*ADV_FP_ONE,0,6*ADV_FP_ONE};
+    AdventureCollision_MoveAndSlide(&position,&velocity,test_wall_x,0,
+                                     ADV_FP_ONE,4*ADV_FP_ONE,0);
+    assert(position.x <= 10*ADV_FP_ONE);
+    assert(position.x >= 8*ADV_FP_ONE);
+    assert(position.z > 5*ADV_FP_ONE);
+    assert(velocity.x == position.x);
+    assert(velocity.z == position.z);
+
+    position.x=0; position.z=0;
+    velocity.x=20*ADV_FP_ONE; velocity.z=20*ADV_FP_ONE;
+    AdventureCollision_MoveAndSlide(&position,&velocity,test_wall_corner,0,
+                                     ADV_FP_ONE,4*ADV_FP_ONE,0);
+    assert(position.x <= 10*ADV_FP_ONE && position.x >= 7*ADV_FP_ONE);
+    assert(position.z <= 10*ADV_FP_ONE && position.z >= 7*ADV_FP_ONE);
+}
+static void test_wall_gameplay(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain = {test_world_ground, 0, test_wall_x};
+    AdventureGame_SetTerrain(&game, terrain);
+    AdventureVec3 spawn = {5*ADV_FP_ONE,0,0};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    AdventureRawInput input = {0};
+    input.move_y=32767;
+    for (int i=0;i<120;i++)
+        assert(AdventureGame_Tick(&game,input,kEast));
+    assert(game.player.pos.x < 10*ADV_FP_ONE);
+    assert(game.player.pos.x > 8*ADV_FP_ONE);
+    assert(game.player.grounded);
+    input.move_y=0;
+    input.move_x=32767;
+    int32_t z=game.player.pos.z;
+    for (int i=0;i<12;i++)
+        assert(AdventureGame_Tick(&game,input,kEast));
+    assert(game.player.pos.z > z);
+    assert(game.player.pos.x < 10*ADV_FP_ONE);
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -284,5 +382,8 @@ int main(void)
     test_jump_and_landing();
     test_stacked_floor_and_ledge();
     test_world_replay();
+    test_segment_sweeps();
+    test_wall_sliding();
+    test_wall_gameplay();
     return 0;
 }
