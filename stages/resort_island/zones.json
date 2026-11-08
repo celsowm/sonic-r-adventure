@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "track_id": 1,
+  "zones": [
+    {
+      "id": 1,
+      "acts": [1],
+      "weather": ["snow"],
+      "time_of_day": ["any"],
+      "anchor": "spawn",
+      "triangles": [
+        [[6, -2, -3], [22, -2, -3], [22, -2, 3]],
+        [[6, -2, -3], [22, -2, 3], [6, -2, 3]]
+      ]
+    }
+  ]
+}

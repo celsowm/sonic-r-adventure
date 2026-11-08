@@ -19,6 +19,9 @@
 #include "adventure_roof.h"
 #include "adventure_roof_legacy.h"
 #include "adventure_capsule.h"
+#include "adventure_zone.h"
+#include "adventure_zone_render.h"
+#include "sonicr_paths.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
@@ -32,6 +35,8 @@ extern unsigned char s_keystate[256];
 static int s_adventure_active;
 /* A small fixed-capacity registry, allocated once, not per frame/stack. */
 static AdventureRoofMesh s_selected_roofs;
+/* Fixed-size stage overlays reside outside the frame/SH-4 stack. */
+static AdventureWorld s_adventure_world;
 
 /* One-way bridge into exactly the legacy fields consumed by presentation.
  * Never run UpdatePlayerMovement or the five-player race physics scheduler. */
@@ -58,6 +63,13 @@ int AdventureMode_IsActive(void)
 {
     return s_adventure_active;
 }
+/* Called from the shared track renderer after the original BIN, before
+ * character models. Thus zone surfaces occlude Sonic using normal depth. */
+void AdventureMode_RenderZones(void)
+{
+    if(s_adventure_active)
+        AdventureZoneRender_Draw(&s_adventure_world);
+}
 
 int AdventureMode_RunPreview(void)
 {
@@ -66,12 +78,27 @@ int AdventureMode_RunPreview(void)
     /* Explicit roof selections are empty until individual visual faces have
      * been validated as solid. Do not collide all render decoration geometry. */
     AdventureRoofLegacy_LoadSelected(&s_selected_roofs, g_trackId);
-    AdventureTerrain terrain = {AdventureRoofLegacy_QueryGround, &s_selected_roofs,
-                                AdventureTerrain_SweepLegacyWall,
-                                AdventureTerrain_QueryLegacyOverhead,
-                                AdventureCapsule_SweepMesh,
-                                AdventureRoofLegacy_QueryNormal};
-    AdventureGame_SetTerrain(&game, terrain);
+    AdventureTerrain original={
+        AdventureRoofLegacy_QueryGround,&s_selected_roofs,
+        AdventureTerrain_SweepLegacyWall,
+        AdventureTerrain_QueryLegacyOverhead,
+        AdventureCapsule_SweepMesh,
+        AdventureRoofLegacy_QueryNormal
+    };
+    /* Use the original level's spawn as an optional content anchor.
+     * Real zone-pack files specify their coordinates; a synthetic bridge
+     * is available as a small snow-only vertical-slice fallback. */
+    AdventureVec3 spawn=AdventureMath_FromLegacy(g_playerBase[0].posX,
+                                                  g_playerBase[0].posY,
+                                                  g_playerBase[0].posZ);
+    AdventureWorld_Init(&s_adventure_world,original,(uint16_t)g_trackId,1,
+                        (uint8_t)g_weatherType,(uint8_t)g_timeOfDay);
+    if(g_trackId==TRACK_RESORT_ISLAND &&
+       !AdventureWorld_LoadPackFile(&s_adventure_world,
+                                    PATH_ADVENTURE_ISLAND_ZONES,spawn))
+        (void)AdventureWorld_AddDemoBridge(&s_adventure_world,spawn);
+    AdventureTerrain terrain=AdventureWorld_MakeTerrain(&s_adventure_world);
+    AdventureGame_SetTerrain(&game,terrain);
 
     /* InitLevel already populated the original game resources and Player[0].
      * Use one viewport/one renderable Sonic, never the five race opponents. */
@@ -81,11 +108,7 @@ int AdventureMode_RunPreview(void)
     g_playerBase[0].charId = CHAR_SONIC;
     g_playerBase[0].renderEnabled = 1;
     g_playerBase[0].moveMode = (short)(g_playerBase[0].angleYaw & 0x0fff);
-    AdventureGame_SetSpawn(&game,
-        AdventureMath_FromLegacy(g_playerBase[0].posX,
-                                 g_playerBase[0].posY,
-                                 g_playerBase[0].posZ),
-        (uint16_t)g_playerBase[0].angleYaw);
+    AdventureGame_SetSpawn(&game,spawn,(uint16_t)g_playerBase[0].angleYaw);
 
     /* Do not enter the original pre-race countdown/iris. */
     g_introCountdown = 0;

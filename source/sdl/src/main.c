@@ -179,6 +179,8 @@ static int s_cmdAdventure = 1; /* Optional preview boot mode */
 static int s_cmdAdventure = 0;
 #endif
 static int s_cmdPort = -1;
+/* Debug preview environment choice, applied BEFORE legacy texture loading. */
+static int s_adventureWeatherOverride = -1;
 static char s_cmdUsername[MM_MAX_USERNAME];
 
 extern void UpdateFlyoverCamera(Player *player, CamStateEntry *cam, RenderCamera *outStruct,
@@ -533,6 +535,8 @@ int main(int argc, char *argv[])
         {"fullscreen", no_argument, NULL, 'f'},
         {"username", required_argument, NULL, 'n'},
         {"adventure", no_argument, NULL, 'a'},
+        {"adventure-snow", no_argument, NULL, 'S'},
+        {"adventure-rain", no_argument, NULL, 'R'},
         {NULL, 0, NULL, 0}};
     int opt;
     while ((opt = getopt_long(argc, argv, "", long_opts, NULL)) != -1) {
@@ -548,6 +552,14 @@ int main(int argc, char *argv[])
                 break;
             case 'a':
                 s_cmdAdventure = 1;
+                break;
+            case 'S':
+                s_cmdAdventure = 1;
+                s_adventureWeatherOverride = WEATHER_SNOW;
+                break;
+            case 'R':
+                s_cmdAdventure = 1;
+                s_adventureWeatherOverride = WEATHER_RAIN;
                 break;
             case 'u':
                 s_cmdUnlock = 1;
@@ -796,6 +808,8 @@ def SONICR_DC /* DC splash screen */
         g_raceType = RACE_GP; /* legacy loader expects a known race type */
         g_raceSubMode = SUBMODE_NORMAL;
         g_trackId = TRACK_RESORT_ISLAND;
+        if(s_adventureWeatherOverride>=0)
+            g_weatherType=s_adventureWeatherOverride;
         g_playerBase[0].charId = CHAR_SONIC;
         g_numHumans = 1;
         g_numViewports = 1;

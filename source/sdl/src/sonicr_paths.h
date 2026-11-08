@@ -36,6 +36,9 @@
 #define PATH_FACTORY            DATA_DIR SEP "FACTORY" SEP
 #define PATH_EMERALD            DATA_DIR SEP "EMERALD" SEP
 
+/* Optional Adventure stage overlay assets. User-generated, never originals. */
+#define PATH_ADVENTURE_ISLAND_ZONES DATA_DIR SEP "ADVENTURE" SEP "ISLAND_ZONES.AZN"
+
 /* Track geometry files (.BIN) — note the abbreviated/suffixed names */
 #define PATH_ISLAND_BIN         PATH_ISLAND  "ISLAND_E.BIN"
 #define PATH_CITY_BIN           PATH_CITY    "CITY_B.BIN"

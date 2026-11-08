@@ -16,7 +16,7 @@ static int64_t cross(int64_t ax,int64_t az,int64_t bx,int64_t bz)
 {
     return ax*bz-az*bx;
 }
-static bool triangle_height(const AdventureRoofTriangle *tri,
+bool AdventureRoof_TriangleHeight(const AdventureRoofTriangle *tri,
                             int32_t x,int32_t z,int32_t *out)
 {
     /* Q8 footprint: permits one sub-world-unit of height interpolation
@@ -69,7 +69,7 @@ bool AdventureRoof_QueryGround(void *context,int32_t x,int32_t z,
     for(uint16_t i=0;i<mesh->count;i++){
         const AdventureRoofTriangle *tri=&mesh->triangles[i];
         int32_t y;
-        if(triangle_height(tri,x,z,&y) &&
+        if(AdventureRoof_TriangleHeight(tri,x,z,&y) &&
            y<=maximum && (!found || y>best)) {
             best=y; id=tri->id; found=true;
         }

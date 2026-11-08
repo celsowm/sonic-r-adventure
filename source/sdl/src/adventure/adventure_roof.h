@@ -21,6 +21,10 @@ typedef struct AdventureRoofHit {
 void AdventureRoof_Clear(AdventureRoofMesh *mesh);
 /* Highest approved triangle beneath the foot. Supports landing on BIN-only
  * rooftops without granting collision to decorative render surfaces. */
+/* Direct single-triangle query for larger stage overlay registries.
+ * Same X/Z footprint/positive-up interpolation as the existing mesh path. */
+bool AdventureRoof_TriangleHeight(const AdventureRoofTriangle *triangle,
+                                   int32_t x,int32_t z,int32_t *height);
 bool AdventureRoof_QueryGround(void *context, int32_t x, int32_t z,
                                 int32_t max_height,
                                 int32_t *height, int32_t *triangle_id);

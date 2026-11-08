@@ -7,6 +7,8 @@
 #include "../../source/sdl/src/adventure/adventure_slope.h"
 #include "../../source/sdl/src/adventure/adventure_traction.h"
 #include "../../source/sdl/src/adventure/adventure_camera.h"
+#include "../../source/sdl/src/adventure/adventure_zone.h"
+#include <string.h>
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
@@ -1906,6 +1908,179 @@ static void test_action_camera_slope_and_vertical_prediction(void)
     assert(cam.look_at.y<ADV_CAMERA_LOOK_HEIGHT);
 }
 
+
+/* Versioned AZN1 test pack: 1 snow-only, Act-1, spawn-relative bridge.
+ * Payload is 2 Q12 triangles, no commercial game geometry. */
+static void test_put16(uint8_t *p,uint16_t n)
+{
+    p[0]=(uint8_t)n;p[1]=(uint8_t)(n>>8);
+}
+static void test_put32(uint8_t *p,uint32_t n)
+{
+    for(int i=0;i<4;i++) p[i]=(uint8_t)(n>>(i*8));
+}
+static void test_zone_fixture(uint8_t *pack)
+{
+    memset(pack,0,108);
+    memcpy(pack,"AZN1",4);
+    test_put16(pack+4,1);         /* version */
+    test_put16(pack+6,1);         /* Resort Island */
+    test_put16(pack+8,1);         /* zone_count */
+    test_put16(pack+10,2);        /* triangle_count */
+    test_put32(pack+12,20);       /* descriptor offset */
+    test_put32(pack+16,36);       /* triangle offset */
+    test_put32(pack+20,1);        /* zone stable ID */
+    pack[24]=1;                   /* Act 1 */
+    pack[25]=4;                   /* WEATHER_SNOW */
+    pack[26]=15;                  /* all four times */
+    pack[27]=1;                   /* spawn-relative */
+    test_put16(pack+28,0);
+    test_put16(pack+30,2);
+    static const int32_t triangle_q12[18]={
+        6,-2,-3, 22,-2,-3, 22,-2,3,
+        6,-2,-3, 22,-2,3, 6,-2,3
+    };
+    for(int i=0;i<18;i++)
+        test_put32(pack+36+i*4,
+                   (uint32_t)((int64_t)triangle_q12[i]*ADV_FP_ONE));
+}
+static bool test_zone_base_ground(void *ctx,int32_t x,int32_t z,
+                                  int32_t max_y,AdventureGroundHit *hit)
+{
+    (void)ctx;(void)x;(void)z;
+    if(!hit || max_y<0) return false;
+    *hit=(AdventureGroundHit){0,42,7};
+    return true;
+}
+static void test_zones_weather_act_support_and_capsule(void)
+{
+    uint8_t pack[108];
+    test_zone_fixture(pack);
+    AdventureTerrain base={0};
+    base.query_ground=test_zone_base_ground;
+    AdventureWorld world;
+    AdventureVec3 anchor={100*ADV_FP_ONE,25*ADV_FP_ONE,50*ADV_FP_ONE};
+    AdventureWorld_Init(&world,base,1,1,0,1);
+    assert(AdventureWorld_LoadPackBytes(&world,pack,sizeof(pack),anchor));
+    assert(world.zone_count==1 && world.triangles.count==2);
+    assert(!AdventureWorld_ActiveTriangles(&world));
+    AdventureTerrain terrain=AdventureWorld_MakeTerrain(&world);
+    AdventureGroundHit hit;
+    assert(terrain.query_ground(terrain.context,
+                                110*ADV_FP_ONE,50*ADV_FP_ONE,
+                                30*ADV_FP_ONE,&hit));
+    assert(hit.height==0 && hit.surface_id==42 && hit.layer==7);
+    assert(AdventureWorld_SetEnvironment(&world,1,2,1));
+    assert(AdventureWorld_ActiveTriangles(&world)==2);
+    assert(terrain.query_ground(terrain.context,
+                                110*ADV_FP_ONE,50*ADV_FP_ONE,
+                                30*ADV_FP_ONE,&hit));
+    assert(hit.height==23*ADV_FP_ONE);
+    assert(hit.surface_id==-2-(ADV_ZONE_TRI_ID_BASE+(1<<8)) ||
+           hit.surface_id==-2-(ADV_ZONE_TRI_ID_BASE+(1<<8)+1));
+    assert(hit.layer==0);
+    AdventureVec3 normal;
+    assert(terrain.query_normal(terrain.context,
+                                110*ADV_FP_ONE,50*ADV_FP_ONE,
+                                hit.surface_id,&normal));
+    assert(normal.y==ADV_FP_ONE);
+    assert(terrain.query_ground(terrain.context,
+                                130*ADV_FP_ONE,50*ADV_FP_ONE,
+                                30*ADV_FP_ONE,&hit));
+    assert(hit.height==0 && hit.surface_id==42);
+    AdventureVec3 from={110*ADV_FP_ONE,14*ADV_FP_ONE,50*ADV_FP_ONE};
+    AdventureVec3 to={110*ADV_FP_ONE,30*ADV_FP_ONE,50*ADV_FP_ONE};
+    AdventureCapsuleHit body;
+    assert(terrain.sweep_capsule(terrain.context,from,to,4*ADV_FP_ONE,
+                                 ADV_FP_ONE,&body));
+    assert(body.source==ADV_CONTACT_BIN_TRIANGLE);
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureGame_SetSpawn(&game,
+        (AdventureVec3){110*ADV_FP_ONE,23*ADV_FP_ONE,50*ADV_FP_ONE},0);
+    assert(game.player.grounded);
+    assert(game.player.pos.y==23*ADV_FP_ONE);
+    assert(AdventureGame_Tick(&game,(AdventureRawInput){0},kEast));
+    assert(game.player.grounded && game.player.pos.y==23*ADV_FP_ONE);
+    /* A second Act (or clear/rain weather) cannot see or collide with ice. */
+    assert(AdventureWorld_SetEnvironment(&world,2,2,1));
+    assert(AdventureWorld_ActiveTriangles(&world)==0);
+    assert(!terrain.sweep_capsule(terrain.context,from,to,4*ADV_FP_ONE,
+                                  ADV_FP_ONE,&body));
+    assert(AdventureWorld_SetEnvironment(&world,1,1,1));
+    assert(!AdventureWorld_ActiveTriangles(&world));
+    assert(AdventureWorld_SetEnvironment(&world,1,2,3));
+    assert(AdventureWorld_ActiveTriangles(&world)==2);
+    /* Reject invalid environment without modifying current active state. */
+    assert(!AdventureWorld_SetEnvironment(&world,9,2,1));
+    assert(AdventureWorld_ActiveTriangles(&world)==2);
+}
+static void test_zones_pack_transaction_and_limits(void)
+{
+    uint8_t pack[108],wrong[108];
+    test_zone_fixture(pack);
+    AdventureWorld world;
+    AdventureWorld_Init(&world,(AdventureTerrain){0},1,1,2,1);
+    AdventureVec3 anchor={0,0,0};
+    assert(AdventureWorld_LoadPackBytes(&world,pack,sizeof(pack),anchor));
+    assert(AdventureWorld_ActiveTriangles(&world)==2);
+    AdventureRoofTriangle saved=world.triangles.triangles[0];
+    memcpy(wrong,pack,sizeof(pack));
+    wrong[0]='X';
+    assert(!AdventureWorld_LoadPackBytes(&world,wrong,sizeof(wrong),anchor));
+    memcpy(wrong,pack,sizeof(pack));
+    test_put16(wrong+8,ADV_ZONE_MAX_ZONES+1u);
+    assert(!AdventureWorld_LoadPackBytes(&world,wrong,sizeof(wrong),anchor));
+    memcpy(wrong,pack,sizeof(pack));
+    test_put16(wrong+10,65);
+    assert(!AdventureWorld_LoadPackBytes(&world,wrong,sizeof(wrong),anchor));
+    memcpy(wrong,pack,sizeof(pack));
+    wrong[25]=0; /* disabled weather mask not allowed */
+    assert(!AdventureWorld_LoadPackBytes(&world,wrong,sizeof(wrong),anchor));
+    memcpy(wrong,pack,sizeof(pack));
+    test_put16(wrong+30,3); /* descriptor references missing triangle */
+    assert(!AdventureWorld_LoadPackBytes(&world,wrong,sizeof(wrong),anchor));
+    memcpy(wrong,pack,sizeof(pack));
+    test_put32(wrong+36,0x7FFFFFFFu); /* huge coordinate: reject overflow */
+    assert(!AdventureWorld_LoadPackBytes(&world,wrong,sizeof(wrong),anchor));
+    assert(!AdventureWorld_LoadPackBytes(&world,pack,sizeof(pack)-1,anchor));
+    assert(!AdventureWorld_LoadPackBytes(&world,0,0,anchor));
+    assert(world.zone_count==1 && world.triangles.count==2);
+    assert(world.triangles.triangles[0].a.x==saved.a.x);
+    assert(AdventureWorld_ActiveTriangles(&world)==2);
+
+    AdventureWorld wrong_track;
+    AdventureWorld_Init(&wrong_track,(AdventureTerrain){0},2,1,2,1);
+    assert(!AdventureWorld_LoadPackBytes(&wrong_track,pack,sizeof(pack),anchor));
+    assert(wrong_track.zone_count==0);
+}
+static void test_zones_builtin_snow_bridge(void)
+{
+    AdventureWorld world;
+    AdventureVec3 anchor={-20*ADV_FP_ONE,5*ADV_FP_ONE,30*ADV_FP_ONE};
+    AdventureWorld_Init(&world,(AdventureTerrain){0},1,1,0,0);
+    assert(AdventureWorld_AddDemoBridge(&world,anchor));
+    assert(world.zone_count==1);
+    assert(!AdventureWorld_ActiveTriangles(&world));
+    assert(!AdventureWorld_AddDemoBridge(&world,anchor));
+    assert(AdventureWorld_SetEnvironment(&world,1,2,0));
+    assert(AdventureWorld_ActiveTriangles(&world)==2);
+    AdventureTerrain terrain=AdventureWorld_MakeTerrain(&world);
+    AdventureGroundHit hit;
+    assert(terrain.query_ground(terrain.context,
+                                anchor.x+10*ADV_FP_ONE,anchor.z,
+                                anchor.y,&hit));
+    assert(hit.height==anchor.y-2*ADV_FP_ONE);
+    assert(!terrain.query_ground(terrain.context,
+                                 anchor.x+40*ADV_FP_ONE,anchor.z,
+                                 anchor.y,&hit));
+    assert(AdventureWorld_SetEnvironment(&world,1,0,0));
+    assert(!terrain.query_ground(terrain.context,
+                                 anchor.x+10*ADV_FP_ONE,anchor.z,
+                                 anchor.y,&hit));
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -1970,5 +2145,8 @@ int main(void)
     test_action_camera_right_stick_and_pitch();
     test_action_camera_dynamic_fov();
     test_action_camera_slope_and_vertical_prediction();
+    test_zones_weather_act_support_and_capsule();
+    test_zones_pack_transaction_and_limits();
+    test_zones_builtin_snow_bridge();
     return 0;
 }

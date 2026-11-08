@@ -662,6 +662,8 @@ void RenderHUD(void)
         R_SetFilter(R_FILTER_LINEAR);
 #endif
         RenderTrackD3D();
+        if(AdventureMode_IsActive())
+            AdventureMode_RenderZones();
 #ifdef BLURRY
 //SONICR_DC
         R_SetFilter(R_FILTER_NEAREST);

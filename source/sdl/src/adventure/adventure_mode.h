@@ -10,5 +10,7 @@ int AdventureMode_RunPreview(void);
 
 /* Rendering uses this to omit the legacy race timer/status overlay. */
 int AdventureMode_IsActive(void);
+/* Shared renderer hook; only draws during Adventure preview. */
+void AdventureMode_RenderZones(void);
 
 #endif /* SONICR_ADVENTURE_MODE_H */
