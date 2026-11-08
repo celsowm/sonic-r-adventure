@@ -344,6 +344,8 @@ bool AdventureCapsule_SweepTriangle(AdventureVec3 from,AdventureVec3 to,
     out->fraction=(uint16_t)first;
     out->triangle_id=triangle->id;
     out->source=ADV_CONTACT_BIN_TRIANGLE;
+    out->has_resolved_y=false;
+    out->resolved_y=0;
     normal_at(out,contact,from,to,&f);
     return true;
 }

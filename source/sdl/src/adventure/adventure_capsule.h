@@ -20,6 +20,10 @@ typedef struct AdventureCapsuleHit {
     int32_t triangle_id;     /* BIN face ID, or TER wall/surface ID */
     AdventureVec3 normal;    /* Q12 unit vector from geometry toward capsule */
     AdventureContactSource source;
+    /* TER heightfield hits may need to snap beyond their sampled Q12 TOI
+     * to avoid head/floor penetration at narrow horizontal boundaries. */
+    int32_t resolved_y;
+    bool has_resolved_y;
 } AdventureCapsuleHit;
 
 /* Read-only world query. Independent of original Sonic R globals. */

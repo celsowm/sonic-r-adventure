@@ -32,7 +32,7 @@ bool AdventureSolver_Sweep(void *context, AdventureVec3 from,
         }
     }
     if (terrain.sweep_capsule) {
-        AdventureCapsuleHit mesh;
+        AdventureCapsuleHit mesh={0};
         if (terrain.sweep_capsule(terrain.context,from,to,height,
                                   radius,&mesh) &&
             (!found || mesh.fraction<best.fraction)) {
@@ -56,6 +56,8 @@ bool AdventureSolver_Sweep(void *context, AdventureVec3 from,
             };
             best.source=to.y>from.y?
                         ADV_CONTACT_TER_CEILING:ADV_CONTACT_TER_FLOOR;
+            best.resolved_y=vertical.position.y;
+            best.has_resolved_y=true;
             found=true;
         }
     }

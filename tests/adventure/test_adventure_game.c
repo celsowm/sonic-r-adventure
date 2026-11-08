@@ -720,9 +720,12 @@ static void test_game_tick_hits_narrow_roof(void)
     AdventureRawInput raw={0};
     raw.move_y=32767;
     assert(AdventureGame_Tick(&game,raw,kEast));
-    assert(game.player.pos.x>=5*ADV_FP_ONE);
-    assert(game.player.pos.x<5*ADV_FP_ONE+ADV_FP_ONE/2);
-    assert(game.player.pos.y<=16*ADV_FP_ONE);
+    /* The unified solver stops vertical ascent at the narrow underside,
+     * but allows the rest of the horizontal tick to slide beyond its edge.
+     * Old stop-everything behavior left X trapped within the half-unit roof. */
+    assert(game.player.pos.x>5*ADV_FP_ONE+ADV_FP_ONE/2);
+    assert(game.player.pos.y>15*ADV_FP_ONE &&
+           game.player.pos.y<=16*ADV_FP_ONE);
     assert(game.player.velocity.y==0);
     assert(!game.player.grounded);
 }

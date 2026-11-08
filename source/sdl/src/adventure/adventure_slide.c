@@ -109,6 +109,16 @@ AdventureSlideResult AdventureSlide_Resolve(AdventureVec3 start,
         if (delta.y>0 && hit.normal.y<=-ADV_FP_ONE/2)
             result.touched_ceiling=true;
         AdventureVec3 impact=lerp(current,target,time);
+        /* TER floor/overhead probes use sampled horizontal footprints.
+         * A capsule may already be fractionally past a new platform when
+         * it first enters that footprint. Honor the Y resolved by the TER
+         * height query to avoid head penetration or sinking into a floor. */
+        if(hit.has_resolved_y) {
+            if(hit.source==ADV_CONTACT_TER_CEILING &&
+               impact.y>hit.resolved_y) impact.y=hit.resolved_y;
+            if(hit.source==ADV_CONTACT_TER_FLOOR &&
+               impact.y<hit.resolved_y) impact.y=hit.resolved_y;
+        }
         /* Separate very slightly to prevent repeated zero-time hits. */
         current=add(impact,scale(hit.normal,ADV_SLIDE_SKIN));
         if(count<ADV_SLIDE_CONTACT_LIMIT) normal[count++]=hit.normal;
