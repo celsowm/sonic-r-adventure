@@ -1,6 +1,6 @@
 # WP-02 / WP-03 — Input, Coordinates and Horizontal Movement
 
-**Status:** Source implemented; host CI and real-platform runtime checks are required.
+**Status:** Portable headless tests and complete Linux SDL compilation passed in GitHub Actions (run 42482730081, commit 4758c86c); interactive gameplay and Dreamcast runtime still require verification.
 
 ## Implemented
 
@@ -20,7 +20,7 @@
 - Jump/roll/camera buttons are sampled but do not activate the future actions.
 - The camera is the original chase camera, not the WP-05 adventure camera.
 - Facing yaw and speed caps now use deterministic integer atan approximation and integer square root; renderer alignment still requires visual verification.
-- Runtime SDL/KOS builds with user-supplied Sonic R data and on-hardware frame pacing are not yet verified.
+- Full Linux SDL build passes CI without commercial game data; SDL gameplay execution with user-supplied data, Dreamcast KOS cross-compilation, and on-hardware timing remain unverified.
 
 ## Try the pilot
 
@@ -46,3 +46,10 @@ Controls: WASD/arrows or analog stick/D-pad move in camera-relative horizontal d
 5. Only then replace the temporary chase camera and introduce combat.
 
 **WP-03 is a controller pilot, not a finished playable platform-action vertical slice.**
+
+## Verified CI evidence
+
+- [Adventure gameplay + full SDL build](https://github.com/celsowm/sonic-r-adventure/actions/runs/42482730081) — both jobs succeeded on Ubuntu.
+- Portable game tests run without proprietary game assets.
+- Desktop application compiled with the repository's full SDL2/OpenGL Makefile and default -Werror.
+- No emulator or physical Dreamcast execution is claimed by this run.
