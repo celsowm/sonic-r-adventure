@@ -13,9 +13,15 @@ typedef struct AdventureGroundHit {
  * height==0 is a valid hit (never use 0 as a no-hit sentinel). */
 typedef bool (*AdventureGroundQuery)(void *context, int32_t x, int32_t z,
                                       int32_t max_height, AdventureGroundHit *out);
+/* Lowest terrain surface at or above min_height, used to prevent upward
+ * head penetration into the underside of stacked .TER floor polygons.
+ * This is an explicit two-sided platformer policy, not a legacy race rule. */
+typedef bool (*AdventureOverheadQuery)(void *context, int32_t x, int32_t z,
+                                        int32_t min_height, AdventureGroundHit *out);
 typedef struct AdventureTerrain {
     AdventureGroundQuery query_ground;
     void *context;
-    AdventureWallQuery sweep_wall; /* optional collision against static obstacles */
+    AdventureWallQuery sweep_wall; /* optional static-wall collision */
+    AdventureOverheadQuery query_overhead; /* optional nearest floor above head */
 } AdventureTerrain;
 #endif

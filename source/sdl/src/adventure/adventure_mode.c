@@ -7,7 +7,8 @@
  * rubber-banding, or race-result handling is executed by this loop.
  *
  * WP-04 adds terrain support and vertical jump/gravity/landing simulation.
- * Wall/ceiling sweeps and special loops are deliberately not yet supported.
+ * Static walls and elevated-platform head collision are supported.
+ * Full arbitrary-mesh ceiling sweeps and special loops are not yet supported.
  */
 #include "adventure_mode.h"
 #include "adventure_game.h"
@@ -57,7 +58,9 @@ int AdventureMode_RunPreview(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, 0, AdventureTerrain_SweepLegacyWall};
+    AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, 0,
+                                AdventureTerrain_SweepLegacyWall,
+                                AdventureTerrain_QueryLegacyOverhead};
     AdventureGame_SetTerrain(&game, terrain);
 
     /* InitLevel already populated the original game resources and Player[0].

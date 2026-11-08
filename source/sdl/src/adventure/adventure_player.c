@@ -1,7 +1,8 @@
 /*
  * 60Hz Q20.12 motion. All gameplay integration uses integer arithmetic.
  * WP-04 support query handles terrain ramps, edges, stacked floors and jumping.
- * Horizontal wall/ceiling sweeps and special loop surfaces are not implemented.
+ * Static walls and upward collisions with elevated terrain are supported;
+ * arbitrary mesh ceilings and special loop surfaces are not implemented.
  */
 #include "adventure_player.h"
 #include <stdint.h>
@@ -18,6 +19,7 @@
 #define ADV_JUMP_BUFFER_TICKS 6
 #define ADV_CAPSULE_RADIUS (ADV_FP_ONE)
 #define ADV_CAPSULE_HEIGHT (4 * ADV_FP_ONE)
+#define ADV_HEAD_CLEARANCE (ADV_FP_ONE / 64)
 
 void AdventurePlayer_Init(AdventurePlayer *p, AdventureVec3 pos, uint16_t facing)
 {
@@ -140,6 +142,27 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
                                                 ADV_GRAVITY);
         int32_t old_y = p->pos.y;
         int32_t new_y = AdventureMath_ClampI32((int64_t)old_y + p->velocity.y);
+        if (p->velocity.y > 0 && terrain.query_overhead) {
+            /* The .TER is a walkable-heightfield-like set of floor polygons.
+             * Regard the underside of an elevated floor as solid for Sonic's
+             * head, but NEVER mistake the player's own support as a ceiling.
+             * Query only the span crossed by the head THIS tick. */
+            int32_t old_head = AdventureMath_ClampI32(
+                (int64_t)old_y + ADV_CAPSULE_HEIGHT);
+            int32_t new_head = AdventureMath_ClampI32(
+                (int64_t)new_y + ADV_CAPSULE_HEIGHT);
+            AdventureGroundHit overhead;
+            if (terrain.query_overhead(terrain.context, p->pos.x, p->pos.z,
+                                       old_head, &overhead) &&
+                overhead.height <= new_head) {
+                int32_t limit = AdventureMath_ClampI32(
+                    (int64_t)overhead.height - ADV_CAPSULE_HEIGHT -
+                    ADV_HEAD_CLEARANCE);
+                /* Never lower the player when the head was already touching. */
+                new_y = limit > old_y ? limit : old_y;
+                p->velocity.y = 0;
+            }
+        }
         if (p->velocity.y <= 0) {
             /* Swept downward foot interval: floor is accepted only when
              * intersecting [new_y, old_y] at the new horizontal position.

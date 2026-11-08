@@ -173,7 +173,7 @@ static void test_world_spawn_and_ramp(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, spawn, 0);
@@ -192,7 +192,7 @@ static void test_jump_and_landing(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, spawn, 0);
@@ -222,7 +222,7 @@ static void test_stacked_floor_and_ledge(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 lower = {35 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, lower, 0);
@@ -251,7 +251,7 @@ static void test_world_replay(void)
     AdventureGame a, b;
     AdventureGame_Init(&a);
     AdventureGame_Init(&b);
-    AdventureTerrain terrain = {test_world_ground, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0};
     AdventureGame_SetTerrain(&a, terrain);
     AdventureGame_SetTerrain(&b, terrain);
     AdventureVec3 start = {5 * ADV_FP_ONE, 0, 0};
@@ -388,7 +388,7 @@ static void test_wall_gameplay(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, test_wall_x};
+    AdventureTerrain terrain = {test_world_ground, 0, test_wall_x, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5*ADV_FP_ONE,0,0};
     AdventureGame_SetSpawn(&game,spawn,0);
@@ -408,6 +408,164 @@ static void test_wall_gameplay(void)
     assert(game.player.pos.x < 10*ADV_FP_ONE);
 }
 
+
+/*
+ * Synthetic multi-level .TER footprint. The bottom floor is at 0, and
+ * overhanging walkable platforms are at 20 and 30 units (two-sided surfaces).
+ * These callbacks use the SAME semantic contract as the production adapter.
+ */
+static bool stack_surface(void *context, int32_t x, int32_t z,
+                          int32_t threshold, AdventureGroundHit *out,
+                          bool overhead)
+{
+    (void)context;
+    (void)z;
+    if (x < 0 || x >= 40 * ADV_FP_ONE || !out) return false;
+    const int32_t heights[3] = {0, 20*ADV_FP_ONE, 30*ADV_FP_ONE};
+    bool found = false;
+    int32_t best = 0;
+    int idx = -1;
+    for (int i=0;i<3;i++) {
+        int32_t h = heights[i];
+        if ((overhead ? h >= threshold : h <= threshold) &&
+            (!found || (overhead ? h < best : h > best))) {
+            best=h;
+            idx=i;
+            found=true;
+        }
+    }
+    if (found) {
+        out->height=best;
+        out->surface_id=idx+100;
+        out->layer=idx;
+    }
+    return found;
+}
+static bool stack_ground(void *context, int32_t x, int32_t z,
+                         int32_t maximum, AdventureGroundHit *out)
+{
+    return stack_surface(context,x,z,maximum,out,false);
+}
+static bool stack_overhead(void *context, int32_t x, int32_t z,
+                           int32_t minimum, AdventureGroundHit *out)
+{
+    return stack_surface(context,x,z,minimum,out,true);
+}
+static void test_overhead_query_selection(void)
+{
+    AdventureGroundHit h;
+    assert(stack_ground(0,5*ADV_FP_ONE,0,25*ADV_FP_ONE,&h));
+    assert(h.height==20*ADV_FP_ONE && h.surface_id==101);
+    assert(stack_overhead(0,5*ADV_FP_ONE,0,4*ADV_FP_ONE,&h));
+    assert(h.height==20*ADV_FP_ONE && h.surface_id==101);
+    assert(stack_overhead(0,5*ADV_FP_ONE,0,21*ADV_FP_ONE,&h));
+    assert(h.height==30*ADV_FP_ONE && h.surface_id==102);
+    assert(!stack_overhead(0,5*ADV_FP_ONE,0,31*ADV_FP_ONE,&h));
+    assert(stack_overhead(0,5*ADV_FP_ONE,0,0,&h));
+    assert(h.height==0 && h.surface_id==100);
+    assert(!stack_overhead(0,-ADV_FP_ONE,0,0,&h));
+}
+static void test_jump_head_hits_underside(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead};
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureVec3 spawn={5*ADV_FP_ONE,0,0};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(game.player.grounded);
+    AdventureRawInput raw={0};
+    raw.buttons=ADV_ACTION_JUMP;
+    bool bonked=false;
+    for (int i=0;i<20;i++) {
+        assert(AdventureGame_Tick(&game,raw,kEast));
+        if (!game.player.grounded && game.player.velocity.y==0) {
+            bonked=true;
+            break;
+        }
+        raw.buttons=0;
+    }
+    assert(bonked);
+    /* Sonic's 4-unit head fits below the 20-unit platform with skin. */
+    assert(game.player.pos.y > 15*ADV_FP_ONE);
+    assert(game.player.pos.y < 16*ADV_FP_ONE);
+    assert(game.player.motion==ADV_MOTION_FALL);
+    /* Do not teleport onto the platform overhead on the next frame.
+     * Falling must land on the lower zero-height floor. */
+    raw.buttons=0;
+    bool landed=false;
+    for (int i=0;i<120;i++) {
+        assert(AdventureGame_Tick(&game,raw,kEast));
+        if (game.player.grounded) {landed=true;break;}
+    }
+    assert(landed);
+    assert(game.player.pos.y==0 && game.player.surface_id==100);
+}
+static void test_jump_from_upper_platform(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead};
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureVec3 spawn={5*ADV_FP_ONE,20*ADV_FP_ONE,0};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(game.player.grounded && game.player.surface_id==101);
+    AdventureRawInput raw={0};
+    raw.buttons=ADV_ACTION_JUMP;
+    bool bonked=false;
+    for (int i=0;i<20;i++) {
+        assert(AdventureGame_Tick(&game,raw,kEast));
+        if (!game.player.grounded && game.player.velocity.y==0) {
+            bonked=true; break;
+        }
+        raw.buttons=0;
+    }
+    assert(bonked);
+    assert(game.player.pos.y>25*ADV_FP_ONE);
+    assert(game.player.pos.y<26*ADV_FP_ONE);
+    /* The floor under feet at Y=20 must not block the head at Y=24. */
+    assert(game.player.surface_id==-1);
+}
+static void test_unobstructed_jump_still_works(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain={test_world_ground,0,0,stack_overhead};
+    AdventureGame_SetTerrain(&game,terrain);
+    /* Beyond x=40: no overhead. The ground fixture continues to 45. */
+    AdventureVec3 spawn={42*ADV_FP_ONE,0,0};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    AdventureRawInput raw={0};
+    raw.buttons=ADV_ACTION_JUMP;
+    for (int i=0;i<10;i++) {
+        assert(AdventureGame_Tick(&game,raw,kEast));
+        raw.buttons=0;
+    }
+    assert(game.player.pos.y>16*ADV_FP_ONE);
+    assert(game.player.velocity.y>0);
+}
+static void test_head_bonk_determinism(void)
+{
+    AdventureGame a,b;
+    AdventureGame_Init(&a); AdventureGame_Init(&b);
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead};
+    AdventureGame_SetTerrain(&a,terrain);
+    AdventureGame_SetTerrain(&b,terrain);
+    AdventureVec3 spawn={5*ADV_FP_ONE,0,0};
+    AdventureGame_SetSpawn(&a,spawn,0);
+    AdventureGame_SetSpawn(&b,spawn,0);
+    AdventureRawInput raw={0};
+    for(int i=0;i<300;i++){
+        raw.buttons=(i%61==0)?ADV_ACTION_JUMP:0;
+        assert(AdventureGame_Tick(&a,raw,kEast));
+        assert(AdventureGame_Tick(&b,raw,kEast));
+        assert(a.player.pos.y==b.player.pos.y);
+        assert(a.player.velocity.y==b.player.velocity.y);
+        assert(a.player.grounded==b.player.grounded);
+        assert(a.player.surface_id==b.player.surface_id);
+    }
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -424,5 +582,10 @@ int main(void)
     test_wall_sliding();
     test_wall_gameplay();
     test_legacy_wall_height_gate();
+    test_overhead_query_selection();
+    test_jump_head_hits_underside();
+    test_jump_from_upper_platform();
+    test_unobstructed_jump_still_works();
+    test_head_bonk_determinism();
     return 0;
 }
