@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "adventure_collision.h"
 #include "adventure_roof.h"
+#include "adventure_capsule.h"
 typedef struct AdventureGroundHit {
     int32_t height;        /* top surface Y, Q20.12 */
     int32_t surface_id;
@@ -24,10 +25,10 @@ typedef struct AdventureTerrain {
     void *context;
     AdventureWallQuery sweep_wall; /* optional static-wall collision */
     AdventureOverheadQuery query_overhead; /* optional nearest floor above head */
-    /* Optional swept head SPHERE against explicitly authored BIN roofs.
-     * The terrain.context is passed unchanged to this callback. */
-    bool (*sweep_roof)(void *context, AdventureVec3 head_from,
-                       AdventureVec3 head_to, int32_t radius,
-                       AdventureRoofHit *hit);
+    /* Optional full-body vertical capsule cast against explicitly authored
+     * static BIN roof triangles. The terrain.context is passed unchanged. */
+    bool (*sweep_capsule)(void *context, AdventureVec3 from,
+                          AdventureVec3 to, int32_t height, int32_t radius,
+                          AdventureCapsuleHit *hit);
 } AdventureTerrain;
 #endif

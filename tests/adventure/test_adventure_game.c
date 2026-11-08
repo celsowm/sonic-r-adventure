@@ -1,6 +1,7 @@
 /* Pure C portable action-mode tests: no commercial assets, SDL or KOS. */
 #include "../../source/sdl/src/adventure/adventure_game.h"
 #include "../../source/sdl/src/adventure/adventure_vertical.h"
+#include "../../source/sdl/src/adventure/adventure_capsule.h"
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
@@ -937,7 +938,7 @@ static void test_roof_sphere_game_tick_graze(void)
     AdventureRoof_Clear(&mesh);
     assert(AdventureRoof_Add(&mesh,roof(8*ADV_FP_ONE,406)));
     AdventureTerrain terrain={test_world_ground,&mesh,0,0,
-                              AdventureRoof_SweepMesh};
+                              AdventureCapsule_SweepMesh};
     AdventureGame game;
     AdventureGame_Init(&game);
     AdventureGame_SetTerrain(&game,terrain);
@@ -957,6 +958,128 @@ static void test_roof_sphere_game_tick_graze(void)
            game.player.pos.y<5*ADV_FP_ONE);
 }
 
+
+/* Full translated vertical capsule vs selected triangle, including its
+ * rounded head, shaft, lower endcap, and finite triangle boundary. */
+static void test_capsule_full_body_contacts(void)
+{
+    AdventureRoofTriangle tri=roof(20*ADV_FP_ONE,501);
+    AdventureCapsuleHit hit;
+    AdventureVec3 from={2*ADV_FP_ONE,12*ADV_FP_ONE,2*ADV_FP_ONE};
+    AdventureVec3 to={2*ADV_FP_ONE,20*ADV_FP_ONE,2*ADV_FP_ONE};
+    assert(AdventureCapsule_SweepTriangle(from,to,4*ADV_FP_ONE,
+                                          ADV_FP_ONE,&tri,&hit));
+    assert(hit.fraction>1850 && hit.fraction<2250);
+    assert(hit.triangle_id==501);
+    assert(hit.normal.y<0);
+
+    /* Rounded FOOT descending onto the same triangle from above. */
+    from.y=22*ADV_FP_ONE;to.y=16*ADV_FP_ONE;
+    assert(AdventureCapsule_SweepTriangle(from,to,4*ADV_FP_ONE,
+                                          ADV_FP_ONE,&tri,&hit));
+    assert(hit.fraction>1100 && hit.fraction<1650);
+    assert(hit.normal.y>0);
+
+    /* The shaft straddles Y=20 but never touches with either endcap.
+     * Moving sideways from x=-3 into the triangle must hit edge CA. */
+    from.x=-3*ADV_FP_ONE;to.x=3*ADV_FP_ONE;
+    from.y=17*ADV_FP_ONE;to.y=17*ADV_FP_ONE;
+    assert(AdventureCapsule_SweepTriangle(from,to,6*ADV_FP_ONE,
+                                          ADV_FP_ONE,&tri,&hit));
+    assert(hit.fraction>1000 && hit.fraction<1800);
+    assert(hit.normal.x<0);
+    assert(hit.normal.y>-1500 && hit.normal.y<1500);
+
+    /* A vertical shaft crossing under its rounded lower sphere
+     * collides with a TRIANGLE vertex near x=z=0. */
+    from.x=-ADV_FP_ONE/2; to.x=from.x;
+    from.z=-ADV_FP_ONE/2; to.z=from.z;
+    from.y=10*ADV_FP_ONE;to.y=30*ADV_FP_ONE;
+    assert(AdventureCapsule_SweepTriangle(from,to,4*ADV_FP_ONE,
+                                          ADV_FP_ONE,&tri,&hit));
+    assert(hit.triangle_id==501);
+
+    from.x=-2*ADV_FP_ONE;to.x=from.x;
+    from.z=-2*ADV_FP_ONE;to.z=from.z;
+    assert(!AdventureCapsule_SweepTriangle(from,to,4*ADV_FP_ONE,
+                                           ADV_FP_ONE,&tri,&hit));
+}
+static void test_capsule_tunnelling_and_escape(void)
+{
+    AdventureRoofTriangle tri=roof(20*ADV_FP_ONE,502);
+    AdventureCapsuleHit hit;
+    AdventureVec3 from={-10*ADV_FP_ONE,17*ADV_FP_ONE,
+                        2*ADV_FP_ONE};
+    AdventureVec3 to={20*ADV_FP_ONE,17*ADV_FP_ONE,
+                      2*ADV_FP_ONE};
+    /* Both endpoints are beyond the roof bounds; the shaft crosses it. */
+    assert(AdventureCapsule_SweepTriangle(from,to,6*ADV_FP_ONE,
+                                          ADV_FP_ONE,&tri,&hit));
+    assert(hit.fraction>1000 && hit.fraction<2200);
+    assert(hit.normal.x<0);
+    from.x=-ADV_FP_ONE;to.x=-4*ADV_FP_ONE;
+    assert(!AdventureCapsule_SweepTriangle(from,to,6*ADV_FP_ONE,
+                                           ADV_FP_ONE,&tri,&hit));
+    /* No collision against empty registries or invalid dimensions. */
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    assert(!AdventureCapsule_SweepMesh(&mesh,from,to,6*ADV_FP_ONE,
+                                       ADV_FP_ONE,&hit));
+    assert(!AdventureCapsule_SweepTriangle(from,to,0,ADV_FP_ONE,&tri,&hit));
+    assert(!AdventureCapsule_SweepTriangle(from,to,ADV_FP_ONE,
+                                           ADV_FP_ONE,&tri,&hit));
+    assert(!AdventureCapsule_SweepTriangle(from,to,6*ADV_FP_ONE,
+                                           0,&tri,&hit));
+}
+static void test_capsule_first_contact_and_replay(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    assert(AdventureRoof_Add(&mesh,roof(22*ADV_FP_ONE,522)));
+    assert(AdventureRoof_Add(&mesh,roof(15*ADV_FP_ONE,515)));
+    AdventureVec3 from={2*ADV_FP_ONE,8*ADV_FP_ONE,
+                        2*ADV_FP_ONE};
+    AdventureVec3 to={2*ADV_FP_ONE,27*ADV_FP_ONE,
+                      2*ADV_FP_ONE};
+    AdventureCapsuleHit a,b;
+    for(int i=0;i<60;i++){
+        assert(AdventureCapsule_SweepMesh(&mesh,from,to,4*ADV_FP_ONE,
+                                          ADV_FP_ONE,&a));
+        assert(AdventureCapsule_SweepMesh(&mesh,from,to,4*ADV_FP_ONE,
+                                          ADV_FP_ONE,&b));
+        assert(a.triangle_id==515 && a.triangle_id==b.triangle_id);
+        assert(a.fraction==b.fraction);
+        assert(a.normal.x==b.normal.x);
+        assert(a.normal.y==b.normal.y);
+        assert(a.normal.z==b.normal.z);
+    }
+}
+static void test_capsule_standing_side_contact(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    AdventureRoofTriangle wall={
+        {8*ADV_FP_ONE,2*ADV_FP_ONE,0},
+        {18*ADV_FP_ONE,2*ADV_FP_ONE,0},
+        {8*ADV_FP_ONE,2*ADV_FP_ONE,10*ADV_FP_ONE},530};
+    assert(AdventureRoof_Add(&mesh,wall));
+    AdventureTerrain terrain={test_world_ground,&mesh,0,0,
+                              AdventureCapsule_SweepMesh};
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureVec3 spawn={5*ADV_FP_ONE,0,ADV_FP_ONE};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(game.player.grounded);
+    AdventureRawInput raw={0};
+    raw.move_y=32767;
+    for(int i=0;i<25;i++){
+        assert(AdventureGame_Tick(&game,raw,kEast));
+        assert(game.player.pos.x<=8*ADV_FP_ONE);
+    }
+    assert(game.player.pos.x>6*ADV_FP_ONE);
+    assert(game.player.grounded);
+}
 int main(void)
 {
     test_lifecycle();
@@ -991,5 +1114,9 @@ int main(void)
     test_roof_sphere_not_sticky_on_exit();
     test_roof_sphere_priority();
     test_roof_sphere_game_tick_graze();
+    test_capsule_full_body_contacts();
+    test_capsule_tunnelling_and_escape();
+    test_capsule_first_contact_and_replay();
+    test_capsule_standing_side_contact();
     return 0;
 }

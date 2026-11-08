@@ -16,6 +16,7 @@
 #include "adventure_terrain_legacy.h"
 #include "adventure_roof.h"
 #include "adventure_roof_legacy.h"
+#include "adventure_capsule.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
@@ -68,7 +69,7 @@ int AdventureMode_RunPreview(void)
     AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, &s_selected_roofs,
                                 AdventureTerrain_SweepLegacyWall,
                                 AdventureTerrain_QueryLegacyOverhead,
-                                AdventureRoof_SweepMesh};
+                                AdventureCapsule_SweepMesh};
     AdventureGame_SetTerrain(&game, terrain);
 
     /* InitLevel already populated the original game resources and Player[0].

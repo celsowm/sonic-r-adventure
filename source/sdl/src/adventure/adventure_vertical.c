@@ -101,28 +101,28 @@ bool AdventureVertical_Sweep(AdventureTerrain terrain,
         }
         previous_t=t;
     }
-    if (rising && terrain.sweep_roof) {
-        AdventureVec3 head_from=from,head_to=to;
-        /* capsule_height is the total body height, including rounded top;
-         * therefore the head sphere CENTER sits one radius below it. */
-        head_from.y=AdventureMath_ClampI32(
-            (int64_t)from.y+capsule_height-capsule_radius);
-        head_to.y=AdventureMath_ClampI32(
-            (int64_t)to.y+capsule_height-capsule_radius);
-        AdventureRoofHit roof;
-        if (terrain.sweep_roof(terrain.context,head_from,head_to,
-                               capsule_radius,&roof) &&
-            (!found || roof.fraction<best.fraction)) {
-            best.fraction=roof.fraction;
-            best.position=position_at(from,to,roof.fraction);
-            /* Roof narrow-phase computed exact plane crossing, unlike the
-             * sampled TER heightfield. Nudge foot down by contact skin. */
-            if (best.position.y>from.y)
-                best.position.y=AdventureMath_ClampI32(
-                    (int64_t)best.position.y-ADV_VERTICAL_HEAD_SKIN);
+    if (rising && terrain.sweep_capsule) {
+        AdventureCapsuleHit hit;
+        if (terrain.sweep_capsule(terrain.context,from,to,capsule_height,
+                                  capsule_radius,&hit) &&
+            (!found || hit.fraction<best.fraction)) {
+            best.fraction=hit.fraction;
+            best.position=position_at(from,to,hit.fraction);
+            /* The whole capsule has a first-contact normal: separate
+             * along that normal rather than incorrectly forcing vertical
+             * displacement at a SIDE or lower-endcap contact. */
+            best.position.x=AdventureMath_ClampI32(
+                (int64_t)best.position.x+
+                (int64_t)hit.normal.x*ADV_VERTICAL_HEAD_SKIN/ADV_FP_ONE);
+            best.position.y=AdventureMath_ClampI32(
+                (int64_t)best.position.y+
+                (int64_t)hit.normal.y*ADV_VERTICAL_HEAD_SKIN/ADV_FP_ONE);
+            best.position.z=AdventureMath_ClampI32(
+                (int64_t)best.position.z+
+                (int64_t)hit.normal.z*ADV_VERTICAL_HEAD_SKIN/ADV_FP_ONE);
             best.surface.height=AdventureMath_ClampI32(
                 (int64_t)best.position.y+capsule_height);
-            best.surface.surface_id=-2-roof.triangle_id;
+            best.surface.surface_id=-2-hit.triangle_id;
             best.surface.layer=-1;
             found=true;
         }

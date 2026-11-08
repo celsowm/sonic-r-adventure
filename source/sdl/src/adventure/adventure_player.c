@@ -105,6 +105,30 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
                                     terrain.sweep_wall, terrain.context,
                                     ADV_CAPSULE_RADIUS, ADV_CAPSULE_HEIGHT,
                                     p->surface_layer);
+    if (p->grounded && terrain.sweep_capsule &&
+        (p->pos.x != p->previous_pos.x ||
+         p->pos.z != p->previous_pos.z)) {
+        /* A standing Sonic can hit the SIDE of an explicitly solid roof
+         * with the torso or lower cap even without jumping. Stop the
+         * horizontal translation at the first body contact. */
+        AdventureCapsuleHit hit;
+        if (terrain.sweep_capsule(terrain.context,p->previous_pos,p->pos,
+                                  ADV_CAPSULE_HEIGHT,ADV_CAPSULE_RADIUS,&hit)) {
+            AdventureVec3 target=p->pos;
+            p->pos.x=AdventureMath_ClampI32(
+                (int64_t)p->previous_pos.x+
+                ((int64_t)target.x-p->previous_pos.x)*hit.fraction/ADV_FP_ONE+
+                (int64_t)hit.normal.x*(ADV_FP_ONE/64)/ADV_FP_ONE);
+            p->pos.z=AdventureMath_ClampI32(
+                (int64_t)p->previous_pos.z+
+                ((int64_t)target.z-p->previous_pos.z)*hit.fraction/ADV_FP_ONE+
+                (int64_t)hit.normal.z*(ADV_FP_ONE/64)/ADV_FP_ONE);
+            p->velocity.x=AdventureMath_ClampI32(
+                (int64_t)p->pos.x-p->previous_pos.x);
+            p->velocity.z=AdventureMath_ClampI32(
+                (int64_t)p->pos.z-p->previous_pos.z);
+        }
+    }
 
     if (input.pressed & ADV_ACTION_JUMP) p->buffered_jump = ADV_JUMP_BUFFER_TICKS;
     else if (p->buffered_jump) --p->buffered_jump;
