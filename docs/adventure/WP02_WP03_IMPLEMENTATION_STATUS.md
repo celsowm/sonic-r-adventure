@@ -19,7 +19,7 @@
 - **There is no terrain collision, vertical movement, gravity or jump yet.** The preview holds the original spawn height and Sonic may pass through walls, ramps or ledges.
 - Jump/roll/camera buttons are sampled but do not activate the future actions.
 - The camera is the original chase camera, not the WP-05 adventure camera.
-- Facing yaw is generated with atan2; bit-identical results across every C library/platform have not been established.
+- Facing yaw and speed caps now use deterministic integer atan approximation and integer square root; renderer alignment still requires visual verification.
 - Runtime SDL/KOS builds with user-supplied Sonic R data and on-hardware frame pacing are not yet verified.
 
 ## Try the pilot

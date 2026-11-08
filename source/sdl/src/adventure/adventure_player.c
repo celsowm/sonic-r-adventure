@@ -4,14 +4,12 @@
  * Position and velocity remain integer Q20.12 for deterministic simulation.
  */
 #include "adventure_player.h"
-#include <math.h>
 #include <stdint.h>
 /* These are per-60-Hz-tick tuning constants, NOT measured Sonic Adventure data. */
 #define ADV_MAX_SPEED_Q12 (3 * ADV_FP_ONE)  /* 180 world units/second */
 #define ADV_ACCEL_Q12     900
 #define ADV_BRAKE_Q12     1250
 #define ADV_FACE_THRESHOLD 160
-#define ADV_TAU 6.2831853071795864769
 
 void AdventurePlayer_Init(AdventurePlayer *p, AdventureVec3 pos, uint16_t facing)
 {
@@ -45,10 +43,11 @@ void AdventurePlayer_TickGroundPilot(AdventurePlayer *p, AdventureInput input,
     int64_t speed_sq = vx*vx + vz*vz;
     int64_t cap_sq = (int64_t)ADV_MAX_SPEED_Q12 * ADV_MAX_SPEED_Q12;
     if (speed_sq > cap_sq) {
-        /* Only run sqrt on rare vector-cap overshoots, not every tick. */
-        double speed = sqrt((double)speed_sq);
-        p->velocity.x = (int32_t)((double)vx * ADV_MAX_SPEED_Q12 / speed);
-        p->velocity.z = (int32_t)((double)vz * ADV_MAX_SPEED_Q12 / speed);
+        /* Integer ceiling sqrt prevents overspeed and cross-libm divergence. */
+        uint32_t speed = AdventureMath_IsqrtU64((uint64_t)speed_sq);
+        if ((uint64_t)speed * speed < (uint64_t)speed_sq) ++speed;
+        p->velocity.x = (int32_t)(vx * ADV_MAX_SPEED_Q12 / speed);
+        p->velocity.z = (int32_t)(vz * ADV_MAX_SPEED_Q12 / speed);
     }
     p->pos.x = AdventureMath_ClampI32((int64_t)p->pos.x + p->velocity.x);
     p->pos.z = AdventureMath_ClampI32((int64_t)p->pos.z + p->velocity.z);
@@ -58,10 +57,8 @@ void AdventurePlayer_TickGroundPilot(AdventurePlayer *p, AdventureInput input,
                 ADV_MOTION_MOVING : ADV_MOTION_IDLE;
     if ((p->velocity.x > ADV_FACE_THRESHOLD || p->velocity.x < -ADV_FACE_THRESHOLD ||
          p->velocity.z > ADV_FACE_THRESHOLD || p->velocity.z < -ADV_FACE_THRESHOLD)) {
-        /* 0 yaw points +X, positive yaw points +Z. Renderer alignment must be
-         * confirmed on real stage in WP-02 coordinate probes. */
-        double heading = atan2((double)p->velocity.z, (double)p->velocity.x);
-        int32_t yaw = (int32_t)(heading * 4096.0 / ADV_TAU);
-        p->facing = (uint16_t)(yaw & 4095);
+        /* Integer octant approximation, deterministic on SH-4 and host.
+         * Visually confirm old renderer's yaw convention on Resort Island. */
+        p->facing = AdventureMath_HeadingXZ(p->velocity.x, p->velocity.z);
     }
 }

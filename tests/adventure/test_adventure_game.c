@@ -41,6 +41,22 @@ static void test_coordinates(void)
     AdventureBasis fallback = AdventureMath_CameraBasis(0, 0, 0, 0);
     assert(fallback.forward_x == ADV_FP_ONE && fallback.right_z == ADV_FP_ONE);
 }
+static void test_integer_heading(void)
+{
+    assert(AdventureMath_HeadingXZ(100, 0) == 0);
+    assert(AdventureMath_HeadingXZ(0, 100) == 1024);
+    assert(AdventureMath_HeadingXZ(-100, 0) == 2048);
+    assert(AdventureMath_HeadingXZ(0, -100) == 3072);
+    assert(AdventureMath_HeadingXZ(100, 100) == 512);
+    assert(AdventureMath_HeadingXZ(-100, 100) == 1536);
+    assert(AdventureMath_HeadingXZ(-100, -100) == 2560);
+    assert(AdventureMath_HeadingXZ(100, -100) == 3584);
+    assert(AdventureMath_HeadingXZ(INT32_MIN, 0) == 2048);
+    assert(AdventureMath_IsqrtU64(0) == 0u);
+    assert(AdventureMath_IsqrtU64(144) == 12u);
+    assert(AdventureMath_IsqrtU64(145) == 12u);
+}
+
 static void test_input(void)
 {
     AdventureInputHistory history = {0};
@@ -123,6 +139,7 @@ int main(void)
 {
     test_lifecycle();
     test_coordinates();
+    test_integer_heading();
     test_input();
     test_movement();
     test_repeatability();

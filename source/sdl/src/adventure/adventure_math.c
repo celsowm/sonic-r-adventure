@@ -1,6 +1,6 @@
 #include "adventure_math.h"
 #include <limits.h>
-static uint32_t isqrt64(uint64_t n)
+uint32_t AdventureMath_IsqrtU64(uint64_t n)
 {
     uint64_t bit = (uint64_t)1 << 62, result = 0;
     while (bit > n) bit >>= 2;
@@ -12,6 +12,26 @@ static uint32_t isqrt64(uint64_t n)
         bit >>= 2;
     }
     return (uint32_t)result;
+}
+/* Heading is quantized to Sonic R's 12-bit turn convention.
+ * atan(r) ~= (pi/4)r + 0.273r(1-r), with maximum angular error
+ * well below one degree across the 0..45 degree octant.
+ * All operations are integer and deterministic on SH-4 and desktop. */
+uint16_t AdventureMath_HeadingXZ(int32_t x, int32_t z)
+{
+    uint64_t ax = x < 0 ? (uint64_t)(-(int64_t)x) : (uint64_t)x;
+    uint64_t az = z < 0 ? (uint64_t)(-(int64_t)z) : (uint64_t)z;
+    if (!ax && !az) return 0;
+    uint64_t major = ax >= az ? ax : az;
+    uint64_t minor = ax >= az ? az : ax;
+    uint32_t r = (uint32_t)(minor * 4096u / major);
+    uint32_t angle = (uint32_t)((512u * (uint64_t)r) / 4096u +
+                   (178u * (uint64_t)r * (4096u-r)) / (4096u*4096u));
+    if (az > ax) angle = 1024u - angle;
+    if (x < 0 && z >= 0) angle = 2048u - angle;
+    else if (x < 0 && z < 0) angle = 2048u + angle;
+    else if (z < 0) angle = (4096u - angle) & 4095u;
+    return (uint16_t)(angle & 4095u);
 }
 int32_t AdventureMath_ClampI32(int64_t v)
 {
@@ -47,7 +67,7 @@ AdventureBasis AdventureMath_CameraBasis(int32_t player_x, int32_t player_z,
     if (ax < INT32_MIN) ax = INT32_MIN;
     if (az > INT32_MAX) az = INT32_MAX;
     if (az < INT32_MIN) az = INT32_MIN;
-    uint32_t magnitude = isqrt64((uint64_t)(ax*ax + az*az));
+    uint32_t magnitude = AdventureMath_IsqrtU64((uint64_t)(ax*ax + az*az));
     if (!magnitude) {
         AdventureBasis fallback = {ADV_FP_ONE, 0, 0, ADV_FP_ONE};
         return fallback;
