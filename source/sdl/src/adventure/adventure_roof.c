@@ -182,23 +182,35 @@ static bool edge_contact(AdventureVec3 from,AdventureVec3 to,
     uint64_t r=(uint64_t)(radius+ADV_ROOF_Q6_DIVISOR-1)/
                         ADV_ROOF_Q6_DIVISOR;
     uint64_t limit=r*r;
-    /* Squared distance to a convex segment is a convex function along
-     * linear motion. Binary search the discrete minimum, THEN the earliest
-     * radius crossing. No time samples can skip a vertex/edge touch. */
+    /* The exact distance function is convex, but fixed-point rounding
+     * creates short FLAT plateaus: d(t)==d(t+1) does NOT imply its minimum
+     * lies left of t. A binary discrete-derivative search could therefore
+     * miss a genuine grazing contact entirely. Use ternary bracketing with
+     * equality retaining the middle interval, then inspect that interval
+     * exhaustively. Bounded at 4096 Q12 fractions, no floating point. */
     uint32_t lo=0,hi=ADV_ROOF_END_FRACTION;
-    while (lo<hi) {
-        uint32_t mid=(lo+hi)/2u;
-        uint64_t now=edge_distance_sq(from,to,a,b,mid);
-        uint64_t after=edge_distance_sq(from,to,a,b,mid+1u);
-        if (now<=after) hi=mid; else lo=mid+1u;
+    while (hi-lo>24u) {
+        uint32_t third=(hi-lo)/3u;
+        uint32_t left=lo+third,right=hi-third;
+        uint64_t dl=edge_distance_sq(from,to,a,b,left);
+        uint64_t dr=edge_distance_sq(from,to,a,b,right);
+        if (dl<dr) hi=right;
+        else if (dl>dr) lo=left;
+        else { lo=left;hi=right; }
     }
     uint32_t minimum=lo;
-    if (edge_distance_sq(from,to,a,b,minimum)>limit) return false;
+    uint64_t min_distance=edge_distance_sq(from,to,a,b,minimum);
+    for(uint32_t t=lo+1u;t<=hi;t++) {
+        uint64_t d=edge_distance_sq(from,to,a,b,t);
+        if(d<min_distance) { min_distance=d;minimum=t; }
+    }
+    if (min_distance>limit) return false;
     uint64_t initial=edge_distance_sq(from,to,a,b,0);
     if (initial<=limit) {
-        /* Starting already inside the sphere skin must not pin the player
-         * while leaving the obstacle or moving parallel to it. */
-        if (minimum==0) return false;
+        /* A resting/touching head must not be trapped when leaving or
+         * sliding parallel to the edge. Only return t=0 if the path moves
+         * deeper into contact than the initial discrete distance. */
+        if (min_distance>=initial) return false;
         *fraction=0;
         return true;
     }
