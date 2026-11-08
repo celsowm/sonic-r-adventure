@@ -27,8 +27,6 @@ typedef struct AdventureTerrain {
     AdventureOverheadQuery query_overhead; /* optional nearest floor above head */
     /* Optional full-body vertical capsule cast against explicitly authored
      * static BIN roof triangles. The terrain.context is passed unchanged. */
-    bool (*sweep_capsule)(void *context, AdventureVec3 from,
-                          AdventureVec3 to, int32_t height, int32_t radius,
-                          AdventureCapsuleHit *hit);
+    AdventureCapsuleQuery sweep_capsule;
 } AdventureTerrain;
 #endif

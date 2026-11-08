@@ -35,8 +35,8 @@ make -C source/sdl -j2
 
 ## Remaining limitations
 
-- **Contact response** currently stops remaining motion after the hit rather than implementing fully iterative three-dimensional sliding and stepping.
-- **Falling/landing on authored BIN roofs:** the new general capsule primitive can detect hits from above, but the gameplay integration is initially limited to upward flight and grounded sideways movement. Support on visual-only roofs needs a roof-aware ground/support provider, otherwise Sonic would immediately fall in later ticks.
+- **Contact response:** Bounded 3D sliding against selected static BIN triangles is now implemented for grounded and rising movement ([WP-04.8](WP04_SLIDE_AND_ROOF_SUPPORT.md)). Fully unified TER/BIN response and dynamic contacts are still outstanding.
+- **Landing on authored BIN roofs:** A merged ground provider now allows landings on selected static BIN roofs and preserves grounded support on subsequent ticks ([WP-04.8](WP04_SLIDE_AND_ROOF_SUPPORT.md)). Falling-side capsule sliding and radial roof-edge support are still outstanding.
 - A selected `.BIN` face is considered physical only when explicitly authored. Arbitrary decoration geometry remains visual-only.
 - Complex dynamic objects, mesh rotations, overhang walking, capsule interactions with TER wall vertical extents, slopes/normal-dependent friction, zero-velocity spawn depenetration, and physics performance profiling on real Dreamcast hardware remain unverified.
 - This is convex-per-triangle narrow phase using fixed integer precision; degenerate and extremely large inputs are rejected rather than silently overflowing.

@@ -11,6 +11,8 @@
  * unaffected by visual-mesh collision until a genuine review.
  */
 #include "adventure_roof_legacy.h"
+#include "adventure_terrain_legacy.h"
+#include <limits.h>
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include <stdint.h>
@@ -78,4 +80,29 @@ void AdventureRoofLegacy_LoadSelected(AdventureRoofMesh *mesh,int track_id)
         tri.c=convert_vertex(&vertices[vi[3]]);
         (void)AdventureRoof_Add(mesh,tri);
     }
+}
+
+/*
+ * Deterministic highest-support merge. BIN triangles count ONLY when
+ * explicitly selected by the author. A roof support layer is zero so the
+ * legacy TER wall mask remains active while Sonic stands on an authored roof.
+ */
+bool AdventureRoofLegacy_QueryGround(void *context,int32_t x,int32_t z,
+                                     int32_t max_height,AdventureGroundHit *out)
+{
+    if(!out) return false;
+    AdventureGroundHit ground={0};
+    bool has_ter=AdventureTerrain_QueryLegacy(0,x,z,max_height,&ground);
+    int32_t roof_y,roof_id;
+    bool has_roof=AdventureRoof_QueryGround(context,x,z,max_height,
+                                            &roof_y,&roof_id);
+    if (has_roof && (!has_ter || roof_y>ground.height)) {
+        ground.height=roof_y;
+        /* Keep all authored positive IDs; -1 is reserved for airborne. */
+        ground.surface_id=(roof_id>=0 && roof_id<=INT32_MAX-2)?
+                         -2-roof_id:INT32_MIN;
+        ground.layer=0;
+    }
+    if(has_ter || has_roof) *out=ground;
+    return has_ter || has_roof;
 }

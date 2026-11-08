@@ -19,6 +19,11 @@ typedef struct AdventureRoofHit {
     int32_t triangle_id;
 } AdventureRoofHit;
 void AdventureRoof_Clear(AdventureRoofMesh *mesh);
+/* Highest approved triangle beneath the foot. Supports landing on BIN-only
+ * rooftops without granting collision to decorative render surfaces. */
+bool AdventureRoof_QueryGround(void *context, int32_t x, int32_t z,
+                                int32_t max_height,
+                                int32_t *height, int32_t *triangle_id);
 bool AdventureRoof_Add(AdventureRoofMesh *mesh, AdventureRoofTriangle triangle);
 /* Continuous upward swept HEAD SPHERE against selected roof faces, edges
  * and vertices. Radius is Q20.12. This is not a full body capsule sweep. */

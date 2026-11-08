@@ -6,6 +6,7 @@
  */
 #include "adventure_player.h"
 #include "adventure_vertical.h"
+#include "adventure_slide.h"
 #include <stdint.h>
 #define ADV_MAX_SPEED_Q12 (3 * ADV_FP_ONE)
 #define ADV_ACCEL_Q12 900
@@ -108,26 +109,22 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
     if (p->grounded && terrain.sweep_capsule &&
         (p->pos.x != p->previous_pos.x ||
          p->pos.z != p->previous_pos.z)) {
-        /* A standing Sonic can hit the SIDE of an explicitly solid roof
-         * with the torso or lower cap even without jumping. Stop the
-         * horizontal translation at the first body contact. */
-        AdventureCapsuleHit hit;
-        if (terrain.sweep_capsule(terrain.context,p->previous_pos,p->pos,
-                                  ADV_CAPSULE_HEIGHT,ADV_CAPSULE_RADIUS,&hit)) {
-            AdventureVec3 target=p->pos;
-            p->pos.x=AdventureMath_ClampI32(
-                (int64_t)p->previous_pos.x+
-                ((int64_t)target.x-p->previous_pos.x)*hit.fraction/ADV_FP_ONE+
-                (int64_t)hit.normal.x*(ADV_FP_ONE/64)/ADV_FP_ONE);
-            p->pos.z=AdventureMath_ClampI32(
-                (int64_t)p->previous_pos.z+
-                ((int64_t)target.z-p->previous_pos.z)*hit.fraction/ADV_FP_ONE+
-                (int64_t)hit.normal.z*(ADV_FP_ONE/64)/ADV_FP_ONE);
-            p->velocity.x=AdventureMath_ClampI32(
-                (int64_t)p->pos.x-p->previous_pos.x);
-            p->velocity.z=AdventureMath_ClampI32(
-                (int64_t)p->pos.z-p->previous_pos.z);
-        }
+        /* Allow the unconstrained horizontal motion to continue along a
+         * selected roof's edge. The resolver handles further contacts and
+         * corners instead of discarding the rest of the input tick. */
+        AdventureVec3 delta={
+            AdventureMath_ClampI32((int64_t)p->pos.x-p->previous_pos.x),
+            0,
+            AdventureMath_ClampI32((int64_t)p->pos.z-p->previous_pos.z)
+        };
+        AdventureSlideResult slide=AdventureSlide_Resolve(
+            p->previous_pos,delta,ADV_CAPSULE_HEIGHT,ADV_CAPSULE_RADIUS,
+            terrain.sweep_capsule,terrain.context);
+        p->pos=slide.position;
+        p->velocity.x=AdventureMath_ClampI32(
+            (int64_t)p->pos.x-p->previous_pos.x);
+        p->velocity.z=AdventureMath_ClampI32(
+            (int64_t)p->pos.z-p->previous_pos.z);
     }
 
     if (input.pressed & ADV_ACTION_JUMP) p->buffered_jump = ADV_JUMP_BUFFER_TICKS;
@@ -174,14 +171,31 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
         AdventureVerticalContact contact;
         if (AdventureVertical_Sweep(terrain,from,to,ADV_CAPSULE_HEIGHT,
                                      ADV_CAPSULE_RADIUS,rising,&contact)) {
-            p->pos=contact.position;
-            /* Stop at the first intersecting footprint rather than skipping
-             * a narrow platform and drifting through its far side. */
+            if (contact.capsule_hit && terrain.sweep_capsule) {
+                /* A rising Sonic may slide sideways along an authored roof
+                 * rather than stopping ALL remaining motion at first hit.
+                 * Resolve from the original start so later triangle edges
+                 * are tested as the remaining displacement changes. */
+                AdventureVec3 attempted={
+                    AdventureMath_ClampI32((int64_t)to.x-from.x),
+                    AdventureMath_ClampI32((int64_t)to.y-from.y),
+                    AdventureMath_ClampI32((int64_t)to.z-from.z)
+                };
+                AdventureSlideResult slide=AdventureSlide_Resolve(
+                    from,attempted,ADV_CAPSULE_HEIGHT,ADV_CAPSULE_RADIUS,
+                    terrain.sweep_capsule,terrain.context);
+                p->pos=slide.position;
+                p->velocity.y=slide.tangent_velocity.y;
+            } else {
+                /* TER support/underside still has its original, conservative
+                 * stop-at-contact response. */
+                p->pos=contact.position;
+                p->velocity.y=0;
+            }
             p->velocity.x=AdventureMath_ClampI32(
                 (int64_t)p->pos.x-p->previous_pos.x);
             p->velocity.z=AdventureMath_ClampI32(
                 (int64_t)p->pos.z-p->previous_pos.z);
-            p->velocity.y=0;
             if (!rising) {
                 p->grounded=1;
                 p->surface_id=contact.surface.surface_id;

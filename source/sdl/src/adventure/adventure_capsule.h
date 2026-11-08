@@ -15,6 +15,11 @@ typedef struct AdventureCapsuleHit {
     AdventureVec3 normal;    /* Q12 unit vector from roof toward capsule */
 } AdventureCapsuleHit;
 
+/* Read-only world query. Independent of original Sonic R globals. */
+typedef bool (*AdventureCapsuleQuery)(void *context, AdventureVec3 from,
+                                     AdventureVec3 to, int32_t height,
+                                     int32_t radius, AdventureCapsuleHit *out);
+
 bool AdventureCapsule_SweepTriangle(AdventureVec3 from, AdventureVec3 to,
                                    int32_t height, int32_t radius,
                                    const AdventureRoofTriangle *triangle,

@@ -1,6 +1,6 @@
-# WP-04: Vertical Physics and Terrain Support — First Integration
+# WP-04: Action Platformer Collision — Iterative Integration
 
-**Status:** Floor, static-wall and elevated-platform underside collision integrated. Full 3D capsule/mesh collision coverage and real gameplay verification remain incomplete. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), [diagonal sweeps and visual BIN audit](WP04_DIAGONAL_SWEEP_AND_BIN_AUDIT.md), [explicit opt-in BIN roofs](WP04_EXPLICIT_BIN_ROOFS.md), and [full-height capsule contacts](WP04_CAPSULE_COLLISION.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
+**Status:** Floor/roof support, static-wall sweeps, capsule contact detection and bounded 3D sliding for authored static roofs are integrated. A unified geometry solver, stage-runtime verification and KOS validation remain outstanding. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), [diagonal sweeps](WP04_DIAGONAL_SWEEP_AND_BIN_AUDIT.md), [opt-in BIN roofs](WP04_EXPLICIT_BIN_ROOFS.md), [capsule contacts](WP04_CAPSULE_COLLISION.md), [3D sliding and BIN roof support](WP04_SLIDE_AND_ROOF_SUPPORT.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
 
 ## Implemented
 
@@ -17,9 +17,9 @@
 
 This is deliberately **not** the full collision solution specified in the master plan.
 
-- **Partial collision only:** Static .TER walls have horizontal swept-disc contacts, elevated TER floors block upward head movement, and explicitly authored visual BIN roof faces can be tested by continuous full-height capsule contacts with the shaft, top/bottom caps, faces, edges and vertices for selected roof geometry. No visual roofs are approved by default; full swept capsules, arbitrary scenery and moving platforms remain incomplete.
+- **Partial integration:** Static .TER walls use swept discs; TER floors use sampled head/foot trajectories; and explicitly authorized BIN roof faces use full-height swept capsules with shaft/cap/edge/vertex contacts. Only BIN-static contacts have bounded 3D slide response. No visual roofs are approved by default, and arbitrary scenery/dynamic geometry are excluded.
 - **Special meshes excluded:** loop/ride surfaces, special dynamic geometry, moving platforms and destructible items still need explicit collision providers.
-- **Sweeps are incomplete:** Horizontal static-wall sweeps and sampled diagonal foot/head checks are in place, but iterative 3D capsule response/sliding, radial TER floor-edge contacts, BIN-roof support while falling and thin dynamic geometry are not yet solved.
+- **Solvers are not unified:** Selected BIN triangles can support landing and subsequent grounded movement, and rising/grounded BIN collisions use iterative 3D sliding. TER walls, TER floors and airborne falling-side contacts still use separate resolution paths. Radial TER floor-edge and thin dynamic geometry contacts remain incomplete.
 - **No slope normals:** ramp elevation follows `.TER` geometry but slope-dependent friction, walkability thresholds and steep-slope sliding are not yet implemented.
 - **No respawn checkpoint or death plane:** falling off the stage currently has no recoverable action-state exit.
 - **No gameplay animation mapping:** jump and fall phases have pure simulation states but render animation still needs integration.
@@ -49,6 +49,6 @@ Controls: WASD/arrows or left stick move; Space / A jumps; ESC or START exits pr
 
 1. Verify `.TER` height and floor identity on actual Resort Island geometry; capture signed coordinate traces on both platforms.
 2. Implement walkable slope normals and surface-angle limits.
-3. Replace separate horizontal-disc and head/feet sweeps with a complete 3D capsule/triangle narrow phase and valid roof geometry when such geometry exists.
+3. Unify the TER wall/floor and authored BIN capsule contact responses, validate sliding during descent, and author solid roof entries only after visual review.
 4. Add moving platform support and reliable transitions between collision layers.
 5. Add death-plane/respawn and action animations before claiming the vertical slice is playable.

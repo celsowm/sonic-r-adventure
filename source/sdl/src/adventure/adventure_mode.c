@@ -66,7 +66,7 @@ int AdventureMode_RunPreview(void)
     /* Explicit roof selections are empty until individual visual faces have
      * been validated as solid. Do not collide all render decoration geometry. */
     AdventureRoofLegacy_LoadSelected(&s_selected_roofs, g_trackId);
-    AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, &s_selected_roofs,
+    AdventureTerrain terrain = {AdventureRoofLegacy_QueryGround, &s_selected_roofs,
                                 AdventureTerrain_SweepLegacyWall,
                                 AdventureTerrain_QueryLegacyOverhead,
                                 AdventureCapsule_SweepMesh};

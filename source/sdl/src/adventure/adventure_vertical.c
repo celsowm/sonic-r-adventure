@@ -107,6 +107,7 @@ bool AdventureVertical_Sweep(AdventureTerrain terrain,
                                   capsule_radius,&hit) &&
             (!found || hit.fraction<best.fraction)) {
             best.fraction=hit.fraction;
+            best.capsule_hit=true;
             best.position=position_at(from,to,hit.fraction);
             /* The whole capsule has a first-contact normal: separate
              * along that normal rather than incorrectly forcing vertical

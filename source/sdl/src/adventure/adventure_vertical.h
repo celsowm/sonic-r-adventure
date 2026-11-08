@@ -8,6 +8,7 @@ typedef struct AdventureVerticalContact {
     AdventureVec3 position; /* resolved foot point at impact */
     AdventureGroundHit surface;
     uint16_t fraction;      /* Q12 fraction along full 3D trajectory */
+    bool capsule_hit;       /* contact came from selected BIN capsule provider */
 } AdventureVerticalContact;
 /* Rising chooses between a TER platform underside and the full-body
  * capsule hit against selected visual roofs. Falling uses TER foot heights.

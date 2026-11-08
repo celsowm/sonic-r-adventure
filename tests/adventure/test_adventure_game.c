@@ -2,6 +2,7 @@
 #include "../../source/sdl/src/adventure/adventure_game.h"
 #include "../../source/sdl/src/adventure/adventure_vertical.h"
 #include "../../source/sdl/src/adventure/adventure_capsule.h"
+#include "../../source/sdl/src/adventure/adventure_slide.h"
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
@@ -1080,6 +1081,188 @@ static void test_capsule_standing_side_contact(void)
     assert(game.player.pos.x>6*ADV_FP_ONE);
     assert(game.player.grounded);
 }
+
+/* Synthetic hit planes make the slide response deterministic independently
+ * of triangle feature selection. Each contact returns a fixed-point TOI and
+ * a normal pointing away from the obstacle. */
+static bool test_slide_planes(void *context,AdventureVec3 from,
+                              AdventureVec3 to,int32_t height,int32_t radius,
+                              AdventureCapsuleHit *out)
+{
+    (void)height;
+    (void)radius;
+    const int mode=context ? *(const int *)context : 1;
+    bool found=false;
+    int64_t first=ADV_FP_ONE+1;
+    AdventureCapsuleHit hit={0};
+    if(from.x<8*ADV_FP_ONE && to.x>=8*ADV_FP_ONE) {
+        int64_t t=((int64_t)8*ADV_FP_ONE-from.x)*ADV_FP_ONE/
+                  ((int64_t)to.x-from.x);
+        hit.normal=(AdventureVec3){-ADV_FP_ONE,0,0};
+        hit.triangle_id=1;
+        first=t;
+        found=true;
+    }
+    if(mode>=2 && from.z<8*ADV_FP_ONE && to.z>=8*ADV_FP_ONE) {
+        int64_t t=((int64_t)8*ADV_FP_ONE-from.z)*ADV_FP_ONE/
+                  ((int64_t)to.z-from.z);
+        if(!found || t<first){
+            hit.normal=(AdventureVec3){0,0,-ADV_FP_ONE};
+            hit.triangle_id=2;
+            first=t;
+            found=true;
+        }
+    }
+    if(mode==3 && from.y<8*ADV_FP_ONE && to.y>=8*ADV_FP_ONE) {
+        int64_t t=((int64_t)8*ADV_FP_ONE-from.y)*ADV_FP_ONE/
+                  ((int64_t)to.y-from.y);
+        if(!found || t<first){
+            hit.normal=(AdventureVec3){0,-ADV_FP_ONE,0};
+            hit.triangle_id=3;
+            first=t;
+            found=true;
+        }
+    }
+    if(found){
+        hit.fraction=(uint16_t)first;
+        *out=hit;
+    }
+    return found;
+}
+static void test_slide_tangential_remainder(void)
+{
+    AdventureVec3 start={0,0,0};
+    AdventureVec3 delta={20*ADV_FP_ONE,0,6*ADV_FP_ONE};
+    AdventureSlideResult r=AdventureSlide_Resolve(
+        start,delta,4*ADV_FP_ONE,ADV_FP_ONE,
+        test_slide_planes,0);
+    assert(r.contacts==1);
+    assert(r.first_hit.triangle_id==1);
+    assert(r.position.x<8*ADV_FP_ONE &&
+           r.position.x>7*ADV_FP_ONE);
+    assert(r.position.z>5*ADV_FP_ONE);
+    assert(r.tangent_velocity.x==0);
+    assert(r.tangent_velocity.z==delta.z);
+
+    r=AdventureSlide_Resolve(start,delta,4*ADV_FP_ONE,ADV_FP_ONE,0,0);
+    assert(r.contacts==0 && r.position.x==delta.x &&
+           r.position.z==delta.z);
+}
+static void test_slide_corners_and_ceilings(void)
+{
+    int mode=2;
+    AdventureVec3 start={0,0,0};
+    AdventureVec3 delta={20*ADV_FP_ONE,0,20*ADV_FP_ONE};
+    AdventureSlideResult r=AdventureSlide_Resolve(
+        start,delta,4*ADV_FP_ONE,ADV_FP_ONE,test_slide_planes,&mode);
+    assert(r.contacts>=2);
+    assert(r.position.x<8*ADV_FP_ONE && r.position.x>7*ADV_FP_ONE);
+    assert(r.position.z<8*ADV_FP_ONE && r.position.z>7*ADV_FP_ONE);
+    assert(r.tangent_velocity.x==0 && r.tangent_velocity.z==0);
+
+    mode=3;
+    delta=(AdventureVec3){6*ADV_FP_ONE,20*ADV_FP_ONE,3*ADV_FP_ONE};
+    r=AdventureSlide_Resolve(start,delta,4*ADV_FP_ONE,ADV_FP_ONE,
+                             test_slide_planes,&mode);
+    assert(r.contacts>=1);
+    assert(r.position.y<8*ADV_FP_ONE);
+    assert(r.position.x==delta.x);
+    assert(r.position.z==delta.z);
+    assert(r.tangent_velocity.y==0);
+}
+static void test_slide_actual_triangle(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    AdventureRoofTriangle tri={
+        {8*ADV_FP_ONE,2*ADV_FP_ONE,0},
+        {18*ADV_FP_ONE,2*ADV_FP_ONE,0},
+        {8*ADV_FP_ONE,2*ADV_FP_ONE,10*ADV_FP_ONE},610};
+    assert(AdventureRoof_Add(&mesh,tri));
+    AdventureVec3 from={5*ADV_FP_ONE,0,ADV_FP_ONE};
+    AdventureVec3 delta={10*ADV_FP_ONE,0,4*ADV_FP_ONE};
+    AdventureSlideResult a=AdventureSlide_Resolve(
+        from,delta,4*ADV_FP_ONE,ADV_FP_ONE,
+        AdventureCapsule_SweepMesh,&mesh);
+    assert(a.contacts>=1);
+    assert(a.position.x>=6*ADV_FP_ONE && a.position.x<8*ADV_FP_ONE);
+    assert(a.position.z>from.z+3*ADV_FP_ONE);
+    for(int i=0;i<10;i++){
+        AdventureSlideResult b=AdventureSlide_Resolve(
+            from,delta,4*ADV_FP_ONE,ADV_FP_ONE,
+            AdventureCapsule_SweepMesh,&mesh);
+        assert(a.position.x==b.position.x);
+        assert(a.position.y==b.position.y);
+        assert(a.position.z==b.position.z);
+        assert(a.contacts==b.contacts);
+    }
+}
+static bool test_roof_and_ter_support(void *ctx,int32_t x,int32_t z,
+                                      int32_t maximum,AdventureGroundHit *out)
+{
+    AdventureGroundHit original={0};
+    bool has_original=test_world_ground(0,x,z,maximum,&original);
+    int32_t roof_y,roof_id;
+    bool has_roof=AdventureRoof_QueryGround(ctx,x,z,maximum,
+                                             &roof_y,&roof_id);
+    if(has_roof && (!has_original || roof_y>original.height)) {
+        original.height=roof_y;
+        original.surface_id=-2-roof_id;
+        original.layer=0;
+    }
+    if(has_original || has_roof) *out=original;
+    return has_original || has_roof;
+}
+static void test_authored_roof_support(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    assert(AdventureRoof_Add(&mesh,roof(20*ADV_FP_ONE,620)));
+    int32_t height,id;
+    assert(AdventureRoof_QueryGround(&mesh,2*ADV_FP_ONE,2*ADV_FP_ONE,
+                                     30*ADV_FP_ONE,&height,&id));
+    assert(height==20*ADV_FP_ONE && id==620);
+    assert(!AdventureRoof_QueryGround(&mesh,2*ADV_FP_ONE,2*ADV_FP_ONE,
+                                      19*ADV_FP_ONE,&height,&id));
+    assert(!AdventureRoof_QueryGround(&mesh,15*ADV_FP_ONE,2*ADV_FP_ONE,
+                                      30*ADV_FP_ONE,&height,&id));
+    AdventureGroundHit hit;
+    assert(test_roof_and_ter_support(&mesh,2*ADV_FP_ONE,2*ADV_FP_ONE,
+                                     21*ADV_FP_ONE,&hit));
+    assert(hit.height==20*ADV_FP_ONE);
+    assert(hit.surface_id==-622 && hit.layer==0);
+}
+static void test_game_lands_and_stays_on_bin_roof(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    assert(AdventureRoof_Add(&mesh,roof(20*ADV_FP_ONE,630)));
+    AdventureTerrain terrain={
+        test_roof_and_ter_support,&mesh,0,0,AdventureCapsule_SweepMesh
+    };
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureVec3 spawn={2*ADV_FP_ONE,29*ADV_FP_ONE,2*ADV_FP_ONE};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(!game.player.grounded);
+    AdventureRawInput input={0};
+    bool landed=false;
+    for(int i=0;i<80;i++){
+        assert(AdventureGame_Tick(&game,input,kEast));
+        if(game.player.grounded){landed=true;break;}
+    }
+    assert(landed);
+    assert(game.player.pos.y==20*ADV_FP_ONE);
+    assert(game.player.surface_id==-632);
+    for(int i=0;i<15;i++){
+        assert(AdventureGame_Tick(&game,input,kEast));
+        assert(game.player.grounded);
+        assert(game.player.pos.y==20*ADV_FP_ONE);
+        assert(game.player.surface_id==-632);
+    }
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -1118,5 +1301,10 @@ int main(void)
     test_capsule_tunnelling_and_escape();
     test_capsule_first_contact_and_replay();
     test_capsule_standing_side_contact();
+    test_slide_tangential_remainder();
+    test_slide_corners_and_ceilings();
+    test_slide_actual_triangle();
+    test_authored_roof_support();
+    test_game_lands_and_stays_on_bin_roof();
     return 0;
 }
