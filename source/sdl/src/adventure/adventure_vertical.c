@@ -116,7 +116,8 @@ bool AdventureVertical_Sweep(AdventureTerrain terrain,
             if (best.position.y>from.y)
                 best.position.y=AdventureMath_ClampI32(
                     (int64_t)best.position.y-ADV_VERTICAL_HEAD_SKIN);
-            best.surface.height=best.position.y+capsule_height;
+            best.surface.height=AdventureMath_ClampI32(
+                (int64_t)best.position.y+capsule_height);
             best.surface.surface_id=-2-roof.triangle_id;
             best.surface.layer=-1;
             found=true;

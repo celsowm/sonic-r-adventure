@@ -1,6 +1,6 @@
 # WP-04: Vertical Physics and Terrain Support — First Integration
 
-**Status:** Floor, static-wall and elevated-platform underside collision integrated. Full 3D capsule/mesh collision coverage and real gameplay verification remain incomplete. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), [diagonal sweeps and visual BIN audit](WP04_DIAGONAL_SWEEP_AND_BIN_AUDIT.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
+**Status:** Floor, static-wall and elevated-platform underside collision integrated. Full 3D capsule/mesh collision coverage and real gameplay verification remain incomplete. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), [diagonal sweeps and visual BIN audit](WP04_DIAGONAL_SWEEP_AND_BIN_AUDIT.md), [explicit opt-in BIN roofs](WP04_EXPLICIT_BIN_ROOFS.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
 
 ## Implemented
 
@@ -17,7 +17,7 @@
 
 This is deliberately **not** the full collision solution specified in the master plan.
 
-- **Partial collision only:** Static .TER walls now have horizontal swept-disc contacts and elevated floor polygons block upward head movement, but arbitrary scenery roofs, full 3D swept capsules and moving platforms can still be passed through.
+- **Partial collision only:** Static .TER walls have horizontal swept-disc contacts, elevated TER floors block upward head movement, and explicitly authored visual BIN roof faces can be tested by analytic head-point/triangle-plane TOI. No visual roofs are approved by default; full swept capsules, arbitrary scenery and moving platforms remain incomplete.
 - **Special meshes excluded:** loop/ride surfaces, special dynamic geometry, moving platforms and destructible items still need explicit collision providers.
 - **Sweeps are incomplete:** Horizontal static-wall sweeps and sampled diagonal foot/head checks are in place, but exact 3D capsule/triangle TOI, radial floor-edge contacts and thin dynamic geometry are not yet solved.
 - **No slope normals:** ramp elevation follows `.TER` geometry but slope-dependent friction, walkability thresholds and steep-slope sliding are not yet implemented.

@@ -804,6 +804,32 @@ static void test_sloped_roof_and_diagonal_face(void)
     from.z=-5*ADV_FP_ONE;to.z=-5*ADV_FP_ONE;
     assert(!AdventureRoof_SweepTriangle(from,to,&sloped,&hit));
 }
+
+static void test_roof_edges_and_capacity(void)
+{
+    AdventureRoofTriangle t=roof(20*ADV_FP_ONE,8);
+    AdventureVec3 from={10*ADV_FP_ONE,10*ADV_FP_ONE,0};
+    AdventureVec3 to={10*ADV_FP_ONE,30*ADV_FP_ONE,0};
+    AdventureRoofHit hit;
+    /* An exact triangle corner must not disappear because the Q12 time
+     * fraction was rounded during analytic plane intersection. */
+    assert(AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    from.x=11*ADV_FP_ONE;to.x=11*ADV_FP_ONE;
+    assert(!AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    for(unsigned i=0;i<ADV_ROOF_MAX_TRIANGLES;i++){
+        t.id=(int32_t)i;
+        assert(AdventureRoof_Add(&mesh,t));
+    }
+    assert(mesh.count==ADV_ROOF_MAX_TRIANGLES);
+    assert(!AdventureRoof_Add(&mesh,t));
+    assert(mesh.count==ADV_ROOF_MAX_TRIANGLES);
+    AdventureRoof_Clear(&mesh);
+    assert(mesh.count==0);
+    assert(!AdventureRoof_SweepMesh(&mesh,from,to,&hit));
+}
+
 static void test_roof_in_vertical_gameplay(void)
 {
     AdventureRoofMesh mesh;
@@ -863,5 +889,6 @@ int main(void)
     test_roof_mesh_opt_in_and_priority();
     test_sloped_roof_and_diagonal_face();
     test_roof_in_vertical_gameplay();
+    test_roof_edges_and_capacity();
     return 0;
 }

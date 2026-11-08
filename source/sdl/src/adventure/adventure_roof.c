@@ -11,7 +11,11 @@
 #include <stdint.h>
 #include <string.h>
 
-static uint64_t abs64(int64_t n) { return n<0 ? (uint64_t)(-n) : (uint64_t)n; }
+static uint64_t abs64(int64_t n)
+{
+    /* Defined for INT64_MIN as well as ordinary values. */
+    return n<0 ? (uint64_t)(-(n+1))+1u : (uint64_t)n;
+}
 static int64_t cross2(int64_t ax,int64_t az,int64_t bx,int64_t bz)
 {
     return ax*bz-az*bx;
@@ -94,7 +98,9 @@ bool AdventureRoof_SweepTriangle(AdventureVec3 from,AdventureVec3 to,
     uint64_t length_sum=abs64(bx-ax)+abs64(bz-az)+
                         abs64(cx-bx)+abs64(cz-bz)+
                         abs64(ax-cx)+abs64(az-cz);
-    int64_t epsilon=(int64_t)(length_sum/32u+1u);
+    /* Coordinates above are Q8. Eight Q8 units represent 1/32 world unit.
+     * Cross-product tolerance scales by edge length, not its inverse. */
+    int64_t epsilon=(int64_t)(length_sum*8u+1u);
     if (area>0 ? (edge0 < -epsilon || edge1 < -epsilon || edge2 < -epsilon)
                : (edge0 > epsilon || edge1 > epsilon || edge2 > epsilon))
         return false;
