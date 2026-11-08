@@ -36,7 +36,7 @@ static void steer(AdventureVec3 *v,int32_t tx,int32_t tz,int32_t accel,
         int64_t dot=(int64_t)v->x*tx+(int64_t)v->z*tz;
         uint64_t sq=(uint64_t)((int64_t)v->x*v->x)+
                     (uint64_t)((int64_t)v->z*v->z);
-        int64_t baseline=(int64_t)ADV_TRACTION_RUN_SPEED*
+        uint64_t baseline=(uint64_t)ADV_TRACTION_RUN_SPEED*
                          ADV_TRACTION_RUN_SPEED;
         if(dot>0 && sq>baseline) {
             uint32_t current=AdventureMath_IsqrtU64((uint64_t)sq);
