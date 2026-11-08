@@ -8,10 +8,8 @@
 #include "adventure_vertical.h"
 #include "adventure_solver.h"
 #include "adventure_slope.h"
+#include "adventure_traction.h"
 #include <stdint.h>
-#define ADV_MAX_SPEED_Q12 (3 * ADV_FP_ONE)
-#define ADV_ACCEL_Q12 900
-#define ADV_BRAKE_Q12 1250
 #define ADV_FACE_THRESHOLD 160
 #define ADV_STEP_UP (2 * ADV_FP_ONE)
 #define ADV_GROUND_SNAP (3 * ADV_FP_ONE)
@@ -37,9 +35,11 @@ void AdventurePlayer_Init(AdventurePlayer *p, AdventureVec3 pos, uint16_t facing
     p->grounded = 0;
     p->coyote_ticks = 0;
     p->buffered_jump = 0;
+    p->slope_airborne = 0;
 }
 static void AdventurePlayer_Horizontal(AdventurePlayer *p, AdventureInput input,
-                                        AdventureBasis basis)
+                                        AdventureBasis basis,
+                                        bool grounded_slope, bool airborne_coast)
 {
     int32_t dx = AdventureMath_ClampI32(
         ((int64_t)basis.forward_x * input.move_y +
@@ -47,20 +47,13 @@ static void AdventurePlayer_Horizontal(AdventurePlayer *p, AdventureInput input,
     int32_t dz = AdventureMath_ClampI32(
         ((int64_t)basis.forward_z * input.move_y +
          (int64_t)basis.right_z * input.move_x) / ADV_FP_ONE);
-    int32_t target_x = (int32_t)(((int64_t)dx * ADV_MAX_SPEED_Q12) / ADV_FP_ONE);
-    int32_t target_z = (int32_t)(((int64_t)dz * ADV_MAX_SPEED_Q12) / ADV_FP_ONE);
-    int32_t accel = (input.move_x || input.move_y) ? ADV_ACCEL_Q12 : ADV_BRAKE_Q12;
-    p->velocity.x = AdventureMath_Approach(p->velocity.x, target_x, accel);
-    p->velocity.z = AdventureMath_Approach(p->velocity.z, target_z, accel);
-    int64_t vx = p->velocity.x, vz = p->velocity.z;
-    int64_t speed_sq = vx * vx + vz * vz;
-    int64_t cap_sq = (int64_t)ADV_MAX_SPEED_Q12 * ADV_MAX_SPEED_Q12;
-    if (speed_sq > cap_sq) {
-        uint32_t speed = AdventureMath_IsqrtU64((uint64_t)speed_sq);
-        if ((uint64_t)speed * speed < (uint64_t)speed_sq) ++speed;
-        p->velocity.x = (int32_t)(vx * ADV_MAX_SPEED_Q12 / speed);
-        p->velocity.z = (int32_t)(vz * ADV_MAX_SPEED_Q12 / speed);
-    }
+    int32_t target_x = AdventureMath_ClampI32(
+        (int64_t)dx*ADV_TRACTION_RUN_SPEED/ADV_FP_ONE);
+    int32_t target_z = AdventureMath_ClampI32(
+        (int64_t)dz*ADV_TRACTION_RUN_SPEED/ADV_FP_ONE);
+    AdventureTraction_Update(&p->velocity,target_x,target_z,
+                             input.move_x!=0 || input.move_y!=0,
+                             p->ground_normal,grounded_slope,airborne_coast);
     if (p->velocity.x > ADV_FACE_THRESHOLD || p->velocity.x < -ADV_FACE_THRESHOLD ||
         p->velocity.z > ADV_FACE_THRESHOLD || p->velocity.z < -ADV_FACE_THRESHOLD)
         p->facing = AdventureMath_HeadingXZ(p->velocity.x, p->velocity.z);
@@ -70,7 +63,7 @@ void AdventurePlayer_TickGroundPilot(AdventurePlayer *p, AdventureInput input,
 {
     if (!p) return;
     p->previous_pos = p->pos;
-    AdventurePlayer_Horizontal(p, input, basis);
+    AdventurePlayer_Horizontal(p,input,basis,false,false);
     p->pos.x = AdventureMath_ClampI32((int64_t)p->pos.x + p->velocity.x);
     p->pos.z = AdventureMath_ClampI32((int64_t)p->pos.z + p->velocity.z);
     p->velocity.y = 0;
@@ -106,7 +99,14 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
 {
     if (!p) return;
     p->previous_pos=p->pos;
-    AdventurePlayer_Horizontal(p,input,basis);
+    /* Ground slope contributes gravity tangent; when leaving it, the earned
+     * horizontal velocity keeps rolling in the air until next landing. */
+    bool slope_at_start=p->grounded &&
+        p->ground_normal.y<ADV_FP_ONE-ADV_TRACTION_SLOPE_EPSILON &&
+        AdventureSlope_Walkable(p->ground_normal);
+    bool airborne_coast=!p->grounded && p->slope_airborne;
+    AdventurePlayer_Horizontal(p,input,basis,
+                               slope_at_start,airborne_coast);
     bool was_grounded=p->grounded!=0;
 
     if(input.pressed & ADV_ACTION_JUMP)
@@ -202,7 +202,9 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
         p->surface_layer=support.layer;
         p->ground_normal=support_normal;
         p->coyote_ticks=ADV_COYOTE_TICKS;
+        p->slope_airborne=0;
     }else{
+        if(slope_at_start) p->slope_airborne=1;
         if(was_grounded && p->grounded && !has_support)
             p->coyote_ticks=ADV_COYOTE_TICKS;
         p->grounded=0;

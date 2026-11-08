@@ -5,6 +5,7 @@
 #include "../../source/sdl/src/adventure/adventure_slide.h"
 #include "../../source/sdl/src/adventure/adventure_solver.h"
 #include "../../source/sdl/src/adventure/adventure_slope.h"
+#include "../../source/sdl/src/adventure/adventure_traction.h"
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
@@ -1533,6 +1534,132 @@ static void test_bin_roof_normal_selection(void)
     assert(!AdventureSlope_Walkable(n));
 }
 
+
+/* WP-04.11: a walkable incline projects gravity onto horizontal movement.
+ * No input rolls downhill; uphill input works against slope acceleration;
+ * downhill input amplifies it. None of this uses floats or variable dt. */
+static void test_traction_flat_unchanged(void)
+{
+    AdventureVec3 up={0,ADV_FP_ONE,0};
+    AdventureVec3 v={0,0,0};
+    for(int i=0;i<32;i++)
+        AdventureTraction_Update(&v,3*ADV_FP_ONE,0,true,up,false,false);
+    assert(v.x==ADV_TRACTION_RUN_SPEED && v.z==0);
+    for(int i=0;i<25;i++)
+        AdventureTraction_Update(&v,0,0,false,up,false,false);
+    assert(v.x==0 && v.z==0);
+}
+static void test_traction_uphill_downhill_steer(void)
+{
+    AdventureVec3 n;
+    assert(AdventureSlope_Normalize(-1,2,0,&n));
+    assert(AdventureSlope_Walkable(n));
+    AdventureVec3 uphill={0,0,0},downhill={0,0,0},coast={0,0,0};
+    AdventureTraction_Update(&uphill,3*ADV_FP_ONE,0,true,n,true,false);
+    AdventureTraction_Update(&downhill,-3*ADV_FP_ONE,0,true,n,true,false);
+    AdventureTraction_Update(&coast,0,0,false,n,true,false);
+    assert(uphill.x>0 && uphill.x<ADV_TRACTION_DRIVE_ACCEL);
+    assert(downhill.x<-ADV_TRACTION_DRIVE_ACCEL);
+    assert(coast.x<0 && coast.z==0);
+    /* Continued downhill steering must preserve and build speed above the
+     * flat 3-unit run cap while never exceeding the 5-unit slope cap. */
+    for(int i=0;i<50;i++)
+        AdventureTraction_Update(&downhill,-3*ADV_FP_ONE,0,
+                                  true,n,true,false);
+    assert(downhill.x<-3*ADV_FP_ONE);
+    assert(downhill.x>=-ADV_TRACTION_SLOPE_SPEED);
+    /* On release, uphill speed should decay faster than the same speed
+     * downhill, rather than being cancelled by a flat-ground brake. */
+    AdventureVec3 up_release={2*ADV_FP_ONE,0,0};
+    AdventureVec3 down_release={-2*ADV_FP_ONE,0,0};
+    AdventureTraction_Update(&up_release,0,0,false,n,true,false);
+    AdventureTraction_Update(&down_release,0,0,false,n,true,false);
+    assert(up_release.x<2*ADV_FP_ONE);
+    assert(down_release.x<-2*ADV_FP_ONE);
+}
+static void test_traction_air_carry_and_direction(void)
+{
+    AdventureVec3 n={0,ADV_FP_ONE,0};
+    AdventureVec3 vel={4*ADV_FP_ONE,0,0};
+    AdventureTraction_Update(&vel,0,0,false,n,false,true);
+    assert(vel.x==4*ADV_FP_ONE-ADV_TRACTION_AIR_DRAG);
+    AdventureTraction_Update(&vel,0,3*ADV_FP_ONE,true,n,false,true);
+    assert(vel.z>0);
+    assert(vel.x>3*ADV_FP_ONE);
+    int64_t speed_sq=(int64_t)vel.x*vel.x+(int64_t)vel.z*vel.z;
+    assert(speed_sq<=(int64_t)ADV_TRACTION_SLOPE_SPEED*
+                      ADV_TRACTION_SLOPE_SPEED);
+}
+static bool test_rolling_ledge(void *ctx,int32_t x,int32_t z,
+                                int32_t max_height,AdventureGroundHit *out)
+{
+    (void)ctx;(void)z;
+    if(!out || x<0 || x>=18*ADV_FP_ONE) return false;
+    int32_t y=x/2;
+    if(y>max_height) return false;
+    out->height=y;out->surface_id=890;out->layer=0;
+    return true;
+}
+static bool test_rolling_normal(void *ctx,int32_t x,int32_t z,
+                                int32_t id,AdventureVec3 *out)
+{
+    (void)ctx;(void)x;(void)z;
+    if(id!=890) return false;
+    return AdventureSlope_Normalize(-1,2,0,out);
+}
+static void test_game_slope_roll_and_ledge_momentum(void)
+{
+    AdventureTerrain terrain={
+        test_rolling_ledge,0,0,0,0,test_rolling_normal
+    };
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureVec3 spawn={8*ADV_FP_ONE,4*ADV_FP_ONE,0};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(game.player.grounded);
+    AdventureRawInput neutral={0};
+    for(int i=0;i<4;i++)
+        assert(AdventureGame_Tick(&game,neutral,kEast));
+    assert(game.player.pos.x<spawn.x); /* natural gravity-driven roll */
+
+    /* Walk uphill and launch past the ledge carrying horizontal speed.
+     * Ordinary airborne braking must not destroy the earned momentum. */
+    spawn=(AdventureVec3){16*ADV_FP_ONE,8*ADV_FP_ONE,0};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(game.player.grounded);
+    game.player.velocity.x=3*ADV_FP_ONE;
+    assert(AdventureGame_Tick(&game,neutral,kEast));
+    assert(!game.player.grounded);
+    assert(game.player.slope_airborne);
+    int32_t outgoing=game.player.velocity.x;
+    assert(outgoing>2*ADV_FP_ONE);
+    int32_t old_x=game.player.pos.x;
+    assert(AdventureGame_Tick(&game,neutral,kEast));
+    assert(!game.player.grounded && game.player.slope_airborne);
+    assert(game.player.pos.x>old_x+2*ADV_FP_ONE);
+    assert(game.player.velocity.x>=outgoing-ADV_TRACTION_AIR_DRAG-8);
+    assert(game.player.velocity.x<=outgoing);
+}
+static void test_traction_deterministic_replay(void)
+{
+    AdventureVec3 n;
+    assert(AdventureSlope_Normalize(-1,2,1,&n));
+    AdventureVec3 a={0,0,0},b={0,0,0};
+    for(int i=0;i<400;i++){
+        bool driving=i%37<29;
+        int32_t tx=(i%71<53 ? -3:3)*ADV_FP_ONE;
+        int32_t tz=(i%29<11 ? 2:-2)*ADV_FP_ONE;
+        bool coast=i>=240;
+        AdventureTraction_Update(&a,tx,tz,driving,n,!coast,coast);
+        AdventureTraction_Update(&b,tx,tz,driving,n,!coast,coast);
+        assert(a.x==b.x && a.z==b.z);
+        assert((int64_t)a.x*a.x+(int64_t)a.z*a.z<=
+                (int64_t)ADV_TRACTION_SLOPE_SPEED*
+                ADV_TRACTION_SLOPE_SPEED);
+    }
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -1583,5 +1710,10 @@ int main(void)
     test_slope_support_and_stacked_selection();
     test_slope_gameplay_transition();
     test_bin_roof_normal_selection();
+    test_traction_flat_unchanged();
+    test_traction_uphill_downhill_steer();
+    test_traction_air_carry_and_direction();
+    test_game_slope_roll_and_ledge_momentum();
+    test_traction_deterministic_replay();
     return 0;
 }

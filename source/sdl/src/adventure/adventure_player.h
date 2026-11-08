@@ -21,6 +21,7 @@ typedef struct AdventurePlayer {
     uint8_t grounded;
     uint8_t coyote_ticks;
     uint8_t buffered_jump;
+    uint8_t slope_airborne;   /* keep earned incline momentum until landing */
 } AdventurePlayer;
 void AdventurePlayer_Init(AdventurePlayer *player, AdventureVec3 pos, uint16_t facing);
 /* Horizontal-only legacy pilot retained for isolated controller tests. */
