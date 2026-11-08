@@ -8,7 +8,10 @@ typedef struct AdventureSlideResult {
     AdventureVec3 position;         /* resolved foot position */
     AdventureVec3 tangent_velocity; /* requested displacement projected off walls */
     AdventureCapsuleHit first_hit;  /* valid only if contacts != 0 */
+    AdventureCapsuleHit floor_hit;  /* latest supporting contact */
     uint8_t contacts;
+    bool touched_floor;
+    bool touched_ceiling;
 } AdventureSlideResult;
 
 /* Caller chooses whether to accept vertical motion after sliding (e.g. when

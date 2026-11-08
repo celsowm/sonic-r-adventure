@@ -6,7 +6,7 @@
  */
 #include "adventure_player.h"
 #include "adventure_vertical.h"
-#include "adventure_slide.h"
+#include "adventure_solver.h"
 #include <stdint.h>
 #define ADV_MAX_SPEED_Q12 (3 * ADV_FP_ONE)
 #define ADV_ACCEL_Q12 900
@@ -100,116 +100,95 @@ void AdventurePlayer_TickWorld(AdventurePlayer *p, AdventureInput input,
                                 AdventureBasis basis, AdventureTerrain terrain)
 {
     if (!p) return;
-    p->previous_pos = p->pos;
-    AdventurePlayer_Horizontal(p, input, basis);
-    AdventureCollision_MoveAndSlide(&p->pos, &p->velocity,
-                                    terrain.sweep_wall, terrain.context,
-                                    ADV_CAPSULE_RADIUS, ADV_CAPSULE_HEIGHT,
-                                    p->surface_layer);
-    if (p->grounded && terrain.sweep_capsule &&
-        (p->pos.x != p->previous_pos.x ||
-         p->pos.z != p->previous_pos.z)) {
-        /* Allow the unconstrained horizontal motion to continue along a
-         * selected roof's edge. The resolver handles further contacts and
-         * corners instead of discarding the rest of the input tick. */
-        AdventureVec3 delta={
-            AdventureMath_ClampI32((int64_t)p->pos.x-p->previous_pos.x),
-            0,
-            AdventureMath_ClampI32((int64_t)p->pos.z-p->previous_pos.z)
-        };
-        AdventureSlideResult slide=AdventureSlide_Resolve(
-            p->previous_pos,delta,ADV_CAPSULE_HEIGHT,ADV_CAPSULE_RADIUS,
-            terrain.sweep_capsule,terrain.context);
-        p->pos=slide.position;
-        p->velocity.x=AdventureMath_ClampI32(
-            (int64_t)p->pos.x-p->previous_pos.x);
-        p->velocity.z=AdventureMath_ClampI32(
-            (int64_t)p->pos.z-p->previous_pos.z);
-    }
+    p->previous_pos=p->pos;
+    AdventurePlayer_Horizontal(p,input,basis);
+    bool was_grounded=p->grounded!=0;
 
-    if (input.pressed & ADV_ACTION_JUMP) p->buffered_jump = ADV_JUMP_BUFFER_TICKS;
-    else if (p->buffered_jump) --p->buffered_jump;
-    if (!p->grounded && p->coyote_ticks) --p->coyote_ticks;
+    if(input.pressed & ADV_ACTION_JUMP)
+        p->buffered_jump=ADV_JUMP_BUFFER_TICKS;
+    else if(p->buffered_jump)
+        --p->buffered_jump;
+    if(!p->grounded && p->coyote_ticks)
+        --p->coyote_ticks;
 
-    /* Probe for support before the jump. This preserves ledge coyote ticks
-     * while rejecting floors above the maximum walkable step rise. */
-    AdventureGroundHit hit;
-    int32_t probe_top = AdventureMath_ClampI32((int64_t)p->pos.y + ADV_STEP_UP);
-    bool support = query(terrain, p->pos.x, p->pos.z, probe_top, &hit);
-    bool walkable = support &&
-        hit.height >= AdventureMath_ClampI32((int64_t)p->pos.y - ADV_GROUND_SNAP);
-    if (p->grounded && !walkable) {
-        p->grounded = 0;
-        p->surface_id = -1;
-        p->coyote_ticks = ADV_COYOTE_TICKS;
-    }
-    if (p->grounded && walkable) {
-        p->pos.y = hit.height;
-        p->velocity.y = 0;
-        p->surface_id = hit.surface_id;
-        p->surface_layer = hit.layer;
-    }
-    if (p->buffered_jump && (p->grounded || p->coyote_ticks)) {
-        p->buffered_jump = 0;
-        p->coyote_ticks = 0;
-        p->grounded = 0;
-        p->surface_id = -1;
-        p->velocity.y = ADV_JUMP_IMPULSE;
-    }
-
-    if (!p->grounded) {
-        /* The horizontal wall solver already produced an X/Z displacement.
-         * Test feet or head over the WHOLE diagonal trajectory, not only at
-         * the last X/Z point (which missed thin elevated platforms). */
-        p->velocity.y = AdventureMath_Approach(p->velocity.y, -ADV_TERMINAL,
-                                               ADV_GRAVITY);
-        AdventureVec3 from=p->previous_pos;
-        from.y=p->pos.y; /* freshly snapped support, if applicable */
-        AdventureVec3 to=p->pos;
-        to.y=AdventureMath_ClampI32((int64_t)from.y+p->velocity.y);
-        bool rising=p->velocity.y>0;
-        AdventureVerticalContact contact;
-        if (AdventureVertical_Sweep(terrain,from,to,ADV_CAPSULE_HEIGHT,
-                                     ADV_CAPSULE_RADIUS,rising,&contact)) {
-            if (contact.capsule_hit && terrain.sweep_capsule) {
-                /* A rising Sonic may slide sideways along an authored roof
-                 * rather than stopping ALL remaining motion at first hit.
-                 * Resolve from the original start so later triangle edges
-                 * are tested as the remaining displacement changes. */
-                AdventureVec3 attempted={
-                    AdventureMath_ClampI32((int64_t)to.x-from.x),
-                    AdventureMath_ClampI32((int64_t)to.y-from.y),
-                    AdventureMath_ClampI32((int64_t)to.z-from.z)
-                };
-                AdventureSlideResult slide=AdventureSlide_Resolve(
-                    from,attempted,ADV_CAPSULE_HEIGHT,ADV_CAPSULE_RADIUS,
-                    terrain.sweep_capsule,terrain.context);
-                p->pos=slide.position;
-                p->velocity.y=slide.tangent_velocity.y;
-            } else {
-                /* TER support/underside still has its original, conservative
-                 * stop-at-contact response. */
-                p->pos=contact.position;
-                p->velocity.y=0;
-            }
-            p->velocity.x=AdventureMath_ClampI32(
-                (int64_t)p->pos.x-p->previous_pos.x);
-            p->velocity.z=AdventureMath_ClampI32(
-                (int64_t)p->pos.z-p->previous_pos.z);
-            if (!rising) {
-                p->grounded=1;
-                p->surface_id=contact.surface.surface_id;
-                p->surface_layer=contact.surface.layer;
-                p->coyote_ticks=ADV_COYOTE_TICKS;
-            }
-        }else{
-            p->pos.y=to.y;
+    /* Evaluate support near the intended X/Z position BEFORE integration.
+     * Leaving a ledge must start falling this tick, while a grounded slope
+     * can be followed after the full collision resolution. */
+    if(p->grounded) {
+        int32_t tx=AdventureMath_ClampI32(
+            (int64_t)p->pos.x+p->velocity.x);
+        int32_t tz=AdventureMath_ClampI32(
+            (int64_t)p->pos.z+p->velocity.z);
+        int32_t top=AdventureMath_ClampI32(
+            (int64_t)p->pos.y+ADV_STEP_UP);
+        int32_t bottom=AdventureMath_ClampI32(
+            (int64_t)p->pos.y-ADV_GROUND_SNAP);
+        AdventureGroundHit ahead;
+        if (!query(terrain,tx,tz,top,&ahead) || ahead.height<bottom) {
+            p->grounded=0;
+            p->surface_id=-1;
+            p->coyote_ticks=ADV_COYOTE_TICKS;
         }
     }
-    if (p->grounded) {
-        p->motion = (p->velocity.x || p->velocity.z) ?
-                    ADV_MOTION_MOVING : ADV_MOTION_IDLE;
-    } else {
-        p->motion = p->velocity.y > 0 ? ADV_MOTION_JUMP : ADV_MOTION_FALL;
+
+    bool jumped=p->buffered_jump && (p->grounded || p->coyote_ticks);
+    if(jumped) {
+        p->buffered_jump=0;
+        p->coyote_ticks=0;
+        p->grounded=0;
+        p->surface_id=-1;
+        p->velocity.y=ADV_JUMP_IMPULSE;
     }
+    if(!p->grounded)
+        p->velocity.y=AdventureMath_Approach(
+            p->velocity.y,-ADV_TERMINAL,ADV_GRAVITY);
+    else
+        p->velocity.y=0;
+
+    /* ONE movement path: TER wall discs, TER floor/ceiling probes, authored
+     * BIN triangle capsules all share the same first-contact ordering and
+     * four-contact tangent-space slide response. */
+    AdventureVec3 start=p->pos;
+    AdventureVec3 attempted=p->velocity;
+    AdventureSolver world={terrain,p->surface_layer};
+    AdventureSlideResult result=AdventureSolver_Move(
+        world,start,attempted,ADV_CAPSULE_HEIGHT,ADV_CAPSULE_RADIUS);
+    p->pos=result.position;
+    p->velocity.x=AdventureMath_ClampI32(
+        (int64_t)p->pos.x-start.x);
+    p->velocity.z=AdventureMath_ClampI32(
+        (int64_t)p->pos.z-start.z);
+    p->velocity.y=result.tangent_velocity.y;
+
+    /* Snapping is for PREVIOUSLY grounded players following a ramp, or
+     * airborne players who genuinely hit a supporting face while falling.
+     * Simply passing within two units of a floor in mid-air must NOT
+     * teleport Sonic onto it. */
+    int32_t upper=AdventureMath_ClampI32(
+        (int64_t)p->pos.y+ADV_STEP_UP);
+    int32_t lower=AdventureMath_ClampI32(
+        (int64_t)p->pos.y-ADV_GROUND_SNAP);
+    AdventureGroundHit support;
+    bool has_support=query(terrain,p->pos.x,p->pos.z,upper,&support) &&
+                     support.height>=lower;
+    if(!jumped && has_support &&
+       (was_grounded || result.touched_floor)) {
+        p->pos.y=support.height;
+        p->grounded=1;
+        p->velocity.y=0;
+        p->surface_id=support.surface_id;
+        p->surface_layer=support.layer;
+        p->coyote_ticks=ADV_COYOTE_TICKS;
+    }else{
+        if(was_grounded && p->grounded && !has_support)
+            p->coyote_ticks=ADV_COYOTE_TICKS;
+        p->grounded=0;
+        p->surface_id=-1;
+    }
+
+    if(p->grounded)
+        p->motion=(p->velocity.x || p->velocity.z)?
+                   ADV_MOTION_MOVING:ADV_MOTION_IDLE;
+    else
+        p->motion=p->velocity.y>0?ADV_MOTION_JUMP:ADV_MOTION_FALL;
 }

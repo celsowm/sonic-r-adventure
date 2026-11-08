@@ -9,10 +9,17 @@
 #ifndef SONICR_ADVENTURE_CAPSULE_H
 #define SONICR_ADVENTURE_CAPSULE_H
 #include "adventure_roof.h"
+typedef enum AdventureContactSource {
+    ADV_CONTACT_BIN_TRIANGLE = 0,
+    ADV_CONTACT_TER_WALL,
+    ADV_CONTACT_TER_FLOOR,
+    ADV_CONTACT_TER_CEILING
+} AdventureContactSource;
 typedef struct AdventureCapsuleHit {
     uint16_t fraction;       /* first Q12 overlap, 0..4096 */
-    int32_t triangle_id;
-    AdventureVec3 normal;    /* Q12 unit vector from roof toward capsule */
+    int32_t triangle_id;     /* BIN face ID, or TER wall/surface ID */
+    AdventureVec3 normal;    /* Q12 unit vector from geometry toward capsule */
+    AdventureContactSource source;
 } AdventureCapsuleHit;
 
 /* Read-only world query. Independent of original Sonic R globals. */

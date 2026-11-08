@@ -343,6 +343,7 @@ bool AdventureCapsule_SweepTriangle(AdventureVec3 from,AdventureVec3 to,
     CapClosest contact=closest_at(from,to,height,radius,&f,first);
     out->fraction=(uint16_t)first;
     out->triangle_id=triangle->id;
+    out->source=ADV_CONTACT_BIN_TRIANGLE;
     normal_at(out,contact,from,to,&f);
     return true;
 }

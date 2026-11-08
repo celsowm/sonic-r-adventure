@@ -3,6 +3,7 @@
 #include "../../source/sdl/src/adventure/adventure_vertical.h"
 #include "../../source/sdl/src/adventure/adventure_capsule.h"
 #include "../../source/sdl/src/adventure/adventure_slide.h"
+#include "../../source/sdl/src/adventure/adventure_solver.h"
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
@@ -1267,6 +1268,112 @@ static void test_game_lands_and_stays_on_bin_roof(void)
     }
 }
 
+
+/* The single dispatcher orders native TER walls, TER floor/underside and
+ * authored BIN triangles using one Q12 fraction and contact normal. */
+static bool late_bin_wall(void *ctx,AdventureVec3 from,AdventureVec3 to,
+                          int32_t height,int32_t radius,
+                          AdventureCapsuleHit *hit)
+{
+    (void)ctx; (void)height; (void)radius;
+    if(from.x>=14*ADV_FP_ONE || to.x<14*ADV_FP_ONE) return false;
+    hit->fraction=(uint16_t)(
+        ((int64_t)14*ADV_FP_ONE-from.x)*ADV_FP_ONE/
+        ((int64_t)to.x-from.x));
+    hit->triangle_id=712;
+    hit->normal=(AdventureVec3){-ADV_FP_ONE,0,0};
+    hit->source=ADV_CONTACT_BIN_TRIANGLE;
+    return true;
+}
+static void test_unified_solver_hit_order(void)
+{
+    AdventureTerrain terrain={
+        test_world_ground,0,test_wall_x,0,test_slide_planes
+    };
+    AdventureSolver world={terrain,0};
+    AdventureCapsuleHit hit;
+    AdventureVec3 from={0,0,0};
+    AdventureVec3 to={20*ADV_FP_ONE,0,6*ADV_FP_ONE};
+    assert(AdventureSolver_Sweep(&world,from,to,4*ADV_FP_ONE,
+                                 ADV_FP_ONE,&hit));
+    assert(hit.source==ADV_CONTACT_BIN_TRIANGLE);
+    assert(hit.triangle_id==1);
+    assert(hit.fraction>1550 && hit.fraction<1750);
+
+    terrain.sweep_capsule=late_bin_wall;
+    world.terrain=terrain;
+    assert(AdventureSolver_Sweep(&world,from,to,4*ADV_FP_ONE,
+                                 ADV_FP_ONE,&hit));
+    assert(hit.source==ADV_CONTACT_TER_WALL);
+    assert(hit.normal.x<0 && hit.normal.z==0);
+    assert(hit.fraction>1750 && hit.fraction<1950);
+
+    world.terrain.sweep_wall=0;
+    world.terrain.sweep_capsule=0;
+    from=(AdventureVec3){5*ADV_FP_ONE,10*ADV_FP_ONE,0};
+    to=(AdventureVec3){5*ADV_FP_ONE,-10*ADV_FP_ONE,0};
+    assert(AdventureSolver_Sweep(&world,from,to,4*ADV_FP_ONE,
+                                 ADV_FP_ONE,&hit));
+    assert(hit.source==ADV_CONTACT_TER_FLOOR);
+    assert(hit.normal.y==ADV_FP_ONE);
+
+    world.terrain.query_overhead=stack_overhead;
+    from.y=0;to.y=30*ADV_FP_ONE;
+    assert(AdventureSolver_Sweep(&world,from,to,4*ADV_FP_ONE,
+                                 ADV_FP_ONE,&hit));
+    assert(hit.source==ADV_CONTACT_TER_CEILING);
+    assert(hit.normal.y==-ADV_FP_ONE);
+}
+static void test_unified_wall_then_floor_and_air_slide(void)
+{
+    AdventureTerrain terrain={test_world_ground,0,test_wall_x,0,0};
+    AdventureSolver world={terrain,0};
+    AdventureVec3 from={5*ADV_FP_ONE,5*ADV_FP_ONE,1*ADV_FP_ONE};
+    AdventureVec3 delta={10*ADV_FP_ONE,-10*ADV_FP_ONE,6*ADV_FP_ONE};
+    AdventureSlideResult slide=AdventureSolver_Move(
+        world,from,delta,4*ADV_FP_ONE,ADV_FP_ONE);
+    assert(slide.contacts>=2);
+    assert(slide.first_hit.source==ADV_CONTACT_TER_WALL);
+    assert(slide.touched_floor);
+    assert(slide.floor_hit.source==ADV_CONTACT_TER_FLOOR);
+    assert(slide.position.x>8*ADV_FP_ONE);
+    assert(slide.position.x<10*ADV_FP_ONE);
+    assert(slide.position.z>from.z+5*ADV_FP_ONE);
+    assert(slide.position.y>=0 &&
+           slide.position.y<ADV_FP_ONE);
+    assert(slide.tangent_velocity.y==0);
+
+    /* Airborne motion along a wall does not cancel vertical ascent. */
+    delta.y=6*ADV_FP_ONE;
+    slide=AdventureSolver_Move(world,from,delta,4*ADV_FP_ONE,
+                                ADV_FP_ONE);
+    assert(slide.contacts>=1);
+    assert(slide.first_hit.source==ADV_CONTACT_TER_WALL);
+    assert(!slide.touched_floor);
+    assert(slide.position.y>from.y+5*ADV_FP_ONE);
+    assert(slide.position.z>from.z+5*ADV_FP_ONE);
+}
+static void test_unified_solver_replay(void)
+{
+    AdventureTerrain terrain={test_world_ground,0,test_wall_x,0,late_bin_wall};
+    AdventureSolver world={terrain,0};
+    AdventureVec3 from={5*ADV_FP_ONE,8*ADV_FP_ONE,1*ADV_FP_ONE};
+    AdventureVec3 delta={12*ADV_FP_ONE,-14*ADV_FP_ONE,6*ADV_FP_ONE};
+    AdventureSlideResult first=AdventureSolver_Move(
+        world,from,delta,4*ADV_FP_ONE,ADV_FP_ONE);
+    for(int i=0;i<75;i++){
+        AdventureSlideResult r=AdventureSolver_Move(
+            world,from,delta,4*ADV_FP_ONE,ADV_FP_ONE);
+        assert(r.position.x==first.position.x);
+        assert(r.position.y==first.position.y);
+        assert(r.position.z==first.position.z);
+        assert(r.tangent_velocity.x==first.tangent_velocity.x);
+        assert(r.tangent_velocity.y==first.tangent_velocity.y);
+        assert(r.tangent_velocity.z==first.tangent_velocity.z);
+        assert(r.contacts==first.contacts);
+        assert(r.touched_floor==first.touched_floor);
+    }
+}
 int main(void)
 {
     test_lifecycle();
@@ -1310,5 +1417,8 @@ int main(void)
     test_slide_actual_triangle();
     test_authored_roof_support();
     test_game_lands_and_stays_on_bin_roof();
+    test_unified_solver_hit_order();
+    test_unified_wall_then_floor_and_air_slide();
+    test_unified_solver_replay();
     return 0;
 }

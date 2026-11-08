@@ -1,6 +1,6 @@
 # WP-04: Action Platformer Collision — Iterative Integration
 
-**Status:** Floor/roof support, static-wall sweeps, capsule contact detection and bounded 3D sliding for authored static roofs are integrated. A unified geometry solver, stage-runtime verification and KOS validation remain outstanding. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), [diagonal sweeps](WP04_DIAGONAL_SWEEP_AND_BIN_AUDIT.md), [opt-in BIN roofs](WP04_EXPLICIT_BIN_ROOFS.md), [capsule contacts](WP04_CAPSULE_COLLISION.md), [3D sliding and BIN roof support](WP04_SLIDE_AND_ROOF_SUPPORT.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
+**Status:** Floor/roof support, static-wall sweeps, capsule contact detection and bounded 3D sliding for authored static roofs are integrated. A unified geometry solver, stage-runtime verification and KOS validation remain outstanding. See [wall sweeps](WP04_WALL_COLLISION_STATUS.md), [overhead collisions](WP04_OVERHEAD_COLLISION.md), [diagonal sweeps](WP04_DIAGONAL_SWEEP_AND_BIN_AUDIT.md), [opt-in BIN roofs](WP04_EXPLICIT_BIN_ROOFS.md), [capsule contacts](WP04_CAPSULE_COLLISION.md), [3D sliding and BIN roof support](WP04_SLIDE_AND_ROOF_SUPPORT.md), [unified contact solver](WP04_UNIFIED_CONTACT_SOLVER.md), and [original TER audit](REAL_TER_AUDIT_2026-11-08.md).
 
 ## Implemented
 
@@ -19,7 +19,7 @@ This is deliberately **not** the full collision solution specified in the master
 
 - **Partial integration:** Static .TER walls use swept discs; TER floors use sampled head/foot trajectories; and explicitly authorized BIN roof faces use full-height swept capsules with shaft/cap/edge/vertex contacts. Only BIN-static contacts have bounded 3D slide response. No visual roofs are approved by default, and arbitrary scenery/dynamic geometry are excluded.
 - **Special meshes excluded:** loop/ride surfaces, special dynamic geometry, moving platforms and destructible items still need explicit collision providers.
-- **Solvers are not unified:** Selected BIN triangles can support landing and subsequent grounded movement, and rising/grounded BIN collisions use iterative 3D sliding. TER walls, TER floors and airborne falling-side contacts still use separate resolution paths. Radial TER floor-edge and thin dynamic geometry contacts remain incomplete.
+- **Contact ordering is unified, narrow phases remain specialized:** TER walls, TER ground/overhead and approved BIN triangles now choose the earliest Q12 hit through a single dispatcher and use the same four-contact 3D slide response. TER floors are still sampled heightfields, TER walls are swept horizontal discs, and authored BIN meshes use a full-height capsule cast. Radial TER floor-edge and dynamic geometry contacts remain incomplete.
 - **No slope normals:** ramp elevation follows `.TER` geometry but slope-dependent friction, walkability thresholds and steep-slope sliding are not yet implemented.
 - **No respawn checkpoint or death plane:** falling off the stage currently has no recoverable action-state exit.
 - **No gameplay animation mapping:** jump and fall phases have pure simulation states but render animation still needs integration.

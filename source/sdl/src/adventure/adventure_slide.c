@@ -102,6 +102,12 @@ AdventureSlideResult AdventureSlide_Resolve(AdventureVec3 start,
         uint32_t time=hit.fraction>ADV_FP_ONE?ADV_FP_ONE:hit.fraction;
         if(!result.contacts) result.first_hit=hit;
         ++result.contacts;
+        if (delta.y<0 && hit.normal.y>=ADV_FP_ONE/2) {
+            result.touched_floor=true;
+            result.floor_hit=hit;
+        }
+        if (delta.y>0 && hit.normal.y<=-ADV_FP_ONE/2)
+            result.touched_ceiling=true;
         AdventureVec3 impact=lerp(current,target,time);
         /* Separate very slightly to prevent repeated zero-time hits. */
         current=add(impact,scale(hit.normal,ADV_SLIDE_SKIN));
