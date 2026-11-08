@@ -12,13 +12,19 @@ bool AdventureSlope_Normalize(int64_t x, int64_t y, int64_t z,
        z < -100000000 || z > 100000000) return false;
     uint64_t sq=(uint64_t)(x*x+y*y+z*z);
     if(!sq) return false;
-    uint32_t len=AdventureMath_IsqrtU64(sq);
+    /* Integer sqrt of a tiny raw face normal (e.g. {-1,2,0}) rounds
+     * sqrt(5) down to 2, giving n.y==4096 and incorrectly classifying a
+     * REAL incline as flat. Upscale by Q12 before sqrt whenever safe;
+     * for huge normals, raw sqrt already has ample relative precision. */
+    uint64_t scale=sq <= UINT64_MAX /
+         ((uint64_t)ADV_FP_ONE*ADV_FP_ONE) ? ADV_FP_ONE : 1u;
+    uint32_t len=AdventureMath_IsqrtU64(sq*scale*scale);
     if(!len) return false;
     /* Keep normal positive-up irrespective of original face winding. */
     if(y<0){x=-x;y=-y;z=-z;}
-    out->x=AdventureMath_ClampI32(x*ADV_FP_ONE/len);
-    out->y=AdventureMath_ClampI32(y*ADV_FP_ONE/len);
-    out->z=AdventureMath_ClampI32(z*ADV_FP_ONE/len);
+    out->x=AdventureMath_ClampI32(x*ADV_FP_ONE*(int64_t)scale/len);
+    out->y=AdventureMath_ClampI32(y*ADV_FP_ONE*(int64_t)scale/len);
+    out->z=AdventureMath_ClampI32(z*ADV_FP_ONE*(int64_t)scale/len);
     return true;
 }
 AdventureVec3 AdventureSlope_Normal(AdventureTerrain terrain,

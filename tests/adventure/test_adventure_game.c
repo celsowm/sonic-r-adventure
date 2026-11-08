@@ -1430,6 +1430,8 @@ static void test_slope_normal_math_and_walkability(void)
     assert(flat.y==ADV_FP_ONE && flat.x==0 && flat.z==0);
     assert(AdventureSlope_Normalize(-1,2,0,&shallow));
     assert(shallow.y>ADV_WALKABLE_NORMAL_Y);
+    assert(shallow.y<ADV_FP_ONE); /* sqrt(5) must NOT truncate to 2 */
+    assert(shallow.x<-1700 && shallow.x>-2000);
     assert(AdventureSlope_Walkable(shallow));
     assert(AdventureSlope_Normalize(-2,1,0,&steep));
     assert(steep.y<ADV_WALKABLE_NORMAL_Y);
