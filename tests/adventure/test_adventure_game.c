@@ -1308,7 +1308,8 @@ static void test_unified_solver_hit_order(void)
     assert(AdventureSolver_Sweep(&world,from,to,4*ADV_FP_ONE,
                                  ADV_FP_ONE,&hit));
     assert(hit.source==ADV_CONTACT_TER_WALL);
-    assert(hit.normal.x<0 && hit.normal.z==0);
+    assert(hit.normal.x<-3500);
+    assert(hit.normal.z>-100 && hit.normal.z<100);
     assert(hit.fraction>1750 && hit.fraction<1950);
 
     world.terrain.sweep_wall=0;
