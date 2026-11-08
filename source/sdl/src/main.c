@@ -808,8 +808,6 @@ def SONICR_DC /* DC splash screen */
         g_raceType = RACE_GP; /* legacy loader expects a known race type */
         g_raceSubMode = SUBMODE_NORMAL;
         g_trackId = TRACK_RESORT_ISLAND;
-        if(s_adventureWeatherOverride>=0)
-            g_weatherType=s_adventureWeatherOverride;
         g_playerBase[0].charId = CHAR_SONIC;
         g_numHumans = 1;
         g_numViewports = 1;
@@ -1178,6 +1176,11 @@ race_setup:
     if (g_netSessionActive == 0) {
         LoadTrackSinglePlayer();
     }
+    /* Adventure weather override must follow the legacy loader's random /
+     * configured condition selection, but PRECEDE InitLevel() so the exact
+     * same snow condition is used for original textures and overlay zones. */
+    if(s_cmdAdventure && s_adventureWeatherOverride>=0)
+        g_weatherType=s_adventureWeatherOverride;
     if (g_netSessionActive != 0) {
         if (g_netGameStarted == 0) {
             for (int i = 0; i < 12; i++) {
