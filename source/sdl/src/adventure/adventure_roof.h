@@ -30,7 +30,7 @@ bool AdventureRoof_QueryGround(void *context, int32_t x, int32_t z,
                                 int32_t *height, int32_t *triangle_id);
 bool AdventureRoof_Add(AdventureRoofMesh *mesh, AdventureRoofTriangle triangle);
 /* Return canonical Q12 face normal for an explicitly approved triangle ID. */
-bool AdventureRoof_QueryNormal(void *context, int32_t triangle_id,
+bool AdventureRoof_QueryNormal(const void *context, int32_t triangle_id,
                                 AdventureVec3 *normal);
 /* Continuous upward swept HEAD SPHERE against selected roof faces, edges
  * and vertices. Radius is Q20.12. This is not a full body capsule sweep. */

@@ -78,7 +78,7 @@ bool AdventureRoof_QueryGround(void *context,int32_t x,int32_t z,
     return found;
 }
 
-bool AdventureRoof_QueryNormal(void *context,int32_t triangle_id,
+bool AdventureRoof_QueryNormal(const void *context,int32_t triangle_id,
                                 AdventureVec3 *out)
 {
     const AdventureRoofMesh *mesh=(const AdventureRoofMesh *)context;
