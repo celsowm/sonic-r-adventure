@@ -14,10 +14,11 @@ typedef struct AdventureGame {
     uint32_t tick_count;
     AdventureInputHistory input_history;
     AdventurePlayer player;
+    AdventureTerrain terrain;
 } AdventureGame;
 void AdventureGame_Init(AdventureGame *game);
+void AdventureGame_SetTerrain(AdventureGame *game, AdventureTerrain terrain);
 void AdventureGame_SetSpawn(AdventureGame *game, AdventureVec3 pos, uint16_t facing);
-/* Returns false after shutdown. raw controls are sampled once per fixed tick. */
 bool AdventureGame_Tick(AdventureGame *game, AdventureRawInput raw, AdventureBasis camera_basis);
 void AdventureGame_Shutdown(AdventureGame *game);
 #endif

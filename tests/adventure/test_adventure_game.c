@@ -135,6 +135,143 @@ static void test_repeatability(void)
         assert(a.player.facing == b.player.facing);
     }
 }
+
+/* Height query fixture: zero-height ground, ramp, two overlapping floors,
+ * and a ledge. All positions/heights use Q20.12. */
+static bool test_world_ground(void *context, int32_t x, int32_t z,
+                              int32_t max_height, AdventureGroundHit *out)
+{
+    (void)context;
+    (void)z;
+    int32_t unit = x / ADV_FP_ONE;
+    int32_t candidates[2] = {0, 0};
+    int count = 0;
+    if (unit < 0 || unit >= 45) return false;
+    if (unit < 10) candidates[count++] = 0;
+    else if (unit < 20) candidates[count++] = (unit - 10) * ADV_FP_ONE;
+    else if (unit < 30) candidates[count++] = 10 * ADV_FP_ONE;
+    else if (unit < 40) {
+        candidates[count++] = 0;
+        candidates[count++] = 20 * ADV_FP_ONE;
+    } else candidates[count++] = 0;
+    bool found = false;
+    int32_t best = INT32_MIN;
+    for (int i = 0; i < count; ++i) {
+        if (candidates[i] <= max_height && candidates[i] > best) {
+            best = candidates[i];
+            found = true;
+        }
+    }
+    if (found && out) {
+        out->height = best;
+        out->surface_id = best == 0 ? 11 : best / ADV_FP_ONE + 11;
+        out->layer = 1;
+    }
+    return found;
+}
+static void test_world_spawn_and_ramp(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain = {test_world_ground, 0};
+    AdventureGame_SetTerrain(&game, terrain);
+    AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
+    AdventureGame_SetSpawn(&game, spawn, 0);
+    assert(game.player.grounded);
+    assert(game.player.pos.y == 0);
+    AdventureRawInput input = {0};
+    input.move_y = 32767;
+    for (int i = 0; i < 8; ++i)
+        assert(AdventureGame_Tick(&game, input, kEast));
+    assert(game.player.pos.x > spawn.x);
+    assert(game.player.grounded);
+    assert(game.player.pos.y >= 0);
+    AdventureGame_Shutdown(&game);
+}
+static void test_jump_and_landing(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain = {test_world_ground, 0};
+    AdventureGame_SetTerrain(&game, terrain);
+    AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
+    AdventureGame_SetSpawn(&game, spawn, 0);
+    AdventureRawInput input = {0};
+    input.buttons = ADV_ACTION_JUMP;
+    assert(AdventureGame_Tick(&game, input, kEast));
+    assert(!game.player.grounded);
+    assert(game.player.velocity.y > 0);
+    assert(game.player.pos.y > 0);
+    input.buttons = 0;
+    bool landed = false;
+    for (int i = 0; i < 100; ++i) {
+        assert(AdventureGame_Tick(&game, input, kEast));
+        if (game.player.grounded) { landed = true; break; }
+    }
+    assert(landed);
+    assert(game.player.pos.y == 0);
+    assert(game.player.velocity.y == 0);
+    /* Held button must not automatically initiate a second jump. */
+    input.buttons = ADV_ACTION_JUMP;
+    assert(AdventureGame_Tick(&game, input, kEast));
+    assert(!game.player.grounded);
+    assert(AdventureGame_Tick(&game, input, kEast));
+    assert(!game.player.grounded);
+}
+static void test_stacked_floor_and_ledge(void)
+{
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureTerrain terrain = {test_world_ground, 0};
+    AdventureGame_SetTerrain(&game, terrain);
+    AdventureVec3 lower = {35 * ADV_FP_ONE, 0, 0};
+    AdventureGame_SetSpawn(&game, lower, 0);
+    assert(game.player.grounded && game.player.pos.y == 0);
+    AdventureVec3 upper = {35 * ADV_FP_ONE, 20 * ADV_FP_ONE, 0};
+    AdventureGame_SetSpawn(&game, upper, 0);
+    assert(game.player.grounded && game.player.pos.y == 20 * ADV_FP_ONE);
+    /* No floor beyond x=45, and falling never invents a zero-height hit. */
+    AdventureVec3 edge = {44 * ADV_FP_ONE, 0, 0};
+    AdventureGame_SetSpawn(&game, edge, 0);
+    AdventureRawInput input = {0};
+    input.move_y = 32767;
+    bool fell = false;
+    for (int i = 0; i < 15; i++) {
+        assert(AdventureGame_Tick(&game, input, kEast));
+        if (!game.player.grounded) { fell = true; break; }
+    }
+    assert(fell);
+    assert(game.player.coyote_ticks > 0);
+    input.buttons = ADV_ACTION_JUMP;
+    assert(AdventureGame_Tick(&game, input, kEast));
+    assert(game.player.velocity.y > 0);
+}
+static void test_world_replay(void)
+{
+    AdventureGame a, b;
+    AdventureGame_Init(&a);
+    AdventureGame_Init(&b);
+    AdventureTerrain terrain = {test_world_ground, 0};
+    AdventureGame_SetTerrain(&a, terrain);
+    AdventureGame_SetTerrain(&b, terrain);
+    AdventureVec3 start = {5 * ADV_FP_ONE, 0, 0};
+    AdventureGame_SetSpawn(&a, start, 0);
+    AdventureGame_SetSpawn(&b, start, 0);
+    AdventureRawInput input = {0};
+    for (int i = 0; i < 400; ++i) {
+        input.move_y = (i % 45 < 22) ? 32767 : -32767;
+        input.buttons = (i % 55 == 0) ? ADV_ACTION_JUMP : 0;
+        assert(AdventureGame_Tick(&a, input, kEast));
+        assert(AdventureGame_Tick(&b, input, kEast));
+        assert(a.player.pos.x == b.player.pos.x);
+        assert(a.player.pos.y == b.player.pos.y);
+        assert(a.player.pos.z == b.player.pos.z);
+        assert(a.player.velocity.y == b.player.velocity.y);
+        assert(a.player.grounded == b.player.grounded);
+        assert(a.player.surface_id == b.player.surface_id);
+    }
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -143,5 +280,9 @@ int main(void)
     test_input();
     test_movement();
     test_repeatability();
+    test_world_spawn_and_ramp();
+    test_jump_and_landing();
+    test_stacked_floor_and_ledge();
+    test_world_replay();
     return 0;
 }

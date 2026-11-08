@@ -6,13 +6,13 @@
  * some race/AI data, however NO race physics, lap/rank updates, replay,
  * rubber-banding, or race-result handling is executed by this loop.
  *
- * WP-02/03 adds a deterministic horizontal motion pilot and continuous input.
- * Y is held at the loaded spawn height until WP-04 terrain support/sweeps.
- * This deliberately is not yet a safely navigable 3D platforming stage.
+ * WP-04 adds terrain support and vertical jump/gravity/landing simulation.
+ * Wall/ceiling sweeps and special loops are deliberately not yet supported.
  */
 #include "adventure_mode.h"
 #include "adventure_game.h"
 #include "adventure_math.h"
+#include "adventure_terrain_legacy.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
@@ -41,6 +41,11 @@ static void AdventureMode_ApplyPlayer(const AdventurePlayer *state)
     render->velZ = state->velocity.z;
     render->angleYaw = (int)state->facing;
     render->moveMode = (short)state->facing;
+    render->groundedFlag = state->grounded ? 1 : 0;
+    render->airTimer = state->grounded ? 0 : 1;
+    render->overSurface = state->grounded ? 1 : 0;
+    render->collisionLayer = state->surface_layer;
+    if (state->grounded) render->groundHeight = render->posY;
 }
 
 int AdventureMode_IsActive(void)
@@ -52,6 +57,8 @@ int AdventureMode_RunPreview(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
+    AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, 0};
+    AdventureGame_SetTerrain(&game, terrain);
 
     /* InitLevel already populated the original game resources and Player[0].
      * Use one viewport/one renderable Sonic, never the five race opponents. */
