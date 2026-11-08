@@ -1,4 +1,6 @@
-# WP-05.1 — Fixed-step 3D action camera and renderer bridge
+# WP-05 — Fixed-step 3D action camera and renderer bridge
+
+**WP-05.2 implemented:** [right-stick and vertical orbit, dynamic perspective, improved occlusion](WP05_RIGHT_STICK_FOV_AND_OCCLUSION.md). This document records the WP-05.1 baseline.
 
 **Status:** Implemented in `source/sdl/src/adventure/`, with portable tests and SDL compilation. This is a first-playable camera, **not** verified visually with the original stages or on Dreamcast hardware.
 
@@ -51,11 +53,11 @@ make -C tests/adventure test
 make -C source/sdl -j2
 ```
 
-## Remaining work (WP-05.2+)
+## Baseline limitations and further visual validation
 
 - Visual validation of **camera X/Z sign, yaw/pitch and framing** against the original Resort Island renderer (SDL), followed by the Dreamcast KOS build. CI currently establishes compilation and synthetic determinism only.
 - Smooth collision avoidance around visual-only obstacles and tighter near-camera roof/wall geometry (e.g. an explicit per-stage camera-only collision hull).
-- Right-stick orbit / vertical pitch input, dynamic field of view, acceleration-dependent distance, and better lookahead during jump/fall or loop movement.
+- Right-stick orbit, vertical pitch, speed-dependent perspective and jump/fall lookahead are now implemented in WP-05.2. Acceleration-dependent distance and loop/banked-camera behavior remain outstanding.
 - Camera occlusion cache and performance profiling on Dreamcast; ground ray probes are bounded but call the original legacy polygon query.
 
 No commercial game resources are committed to the repository.

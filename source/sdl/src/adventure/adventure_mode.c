@@ -140,7 +140,7 @@ int AdventureMode_RunPreview(void)
              * ticks; rendering never advances the camera twice per frame. */
             AdventureBasis basis=AdventureCamera_MovementBasis(&camera);
             (void)AdventureGame_Tick(&game, controls, basis);
-            AdventureCamera_Tick(&camera,&game.player,controls.buttons,
+            AdventureCamera_Tick(&camera,&game.player,controls,
                                  AdventureCameraLegacy_Trace,&terrain);
             tick_accum -= 1000u;
             ++ticks;
@@ -153,7 +153,11 @@ int AdventureMode_RunPreview(void)
         /* View matrix updates from the action camera only; the legacy race
          * camera would otherwise override it every render frame. */
         AdventureCameraLegacy_Apply(&camera);
+        int saved_proj_x,saved_proj_y;
+        AdventureCameraLegacy_BeginProjection(&camera,&saved_proj_x,
+                                              &saved_proj_y);
         RenderHUD();
+        AdventureCameraLegacy_EndProjection(saved_proj_x,saved_proj_y);
         FlipD3D();
         ++g_totalFrames;
         ++g_totalFrames2;

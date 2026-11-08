@@ -714,6 +714,11 @@ void platform_adventure_read_input(struct AdventureRawInput *out)
             int ly = SDL_GameControllerGetAxis(pad->ctrl, SDL_CONTROLLER_AXIS_LEFTY);
             out->move_x = SDL_GameControllerGetAxis(pad->ctrl, SDL_CONTROLLER_AXIS_LEFTX);
             out->move_y = (int16_t)(ly == -32768 ? 32767 : -ly);
+            out->look_x=SDL_GameControllerGetAxis(
+                pad->ctrl,SDL_CONTROLLER_AXIS_RIGHTX);
+            int ry=SDL_GameControllerGetAxis(
+                pad->ctrl,SDL_CONTROLLER_AXIS_RIGHTY);
+            out->look_y=(int16_t)(ry==-32768?32767:-ry);
             if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_DPAD_LEFT))
                 out->move_x = -32767;
             if (SDL_GameControllerGetButton(pad->ctrl, SDL_CONTROLLER_BUTTON_DPAD_RIGHT))
@@ -735,6 +740,13 @@ void platform_adventure_read_input(struct AdventureRawInput *out)
                 int ly = SDL_JoystickGetAxis(pad->joy, 1);
                 out->move_x = SDL_JoystickGetAxis(pad->joy, 0);
                 out->move_y = (int16_t)(ly == -32768 ? 32767 : -ly);
+            }
+            /* Generic joystick fallback: right stick typically axes 2/3.
+             * Mapped controllers always use the canonical SDL right axes. */
+            if (SDL_JoystickNumAxes(pad->joy) >= 4) {
+                out->look_x=SDL_JoystickGetAxis(pad->joy,2);
+                int ry=SDL_JoystickGetAxis(pad->joy,3);
+                out->look_y=(int16_t)(ry==-32768?32767:-ry);
             }
             if (SDL_JoystickNumHats(pad->joy) > 0) {
                 Uint8 h = SDL_JoystickGetHat(pad->joy, 0);
@@ -766,6 +778,15 @@ void platform_adventure_read_input(struct AdventureRawInput *out)
         out->buttons |= ADV_ACTION_ROLL;
     if (keys[SDL_SCANCODE_Q]) out->buttons |= ADV_ACTION_CAMERA_LEFT;
     if (keys[SDL_SCANCODE_E]) out->buttons |= ADV_ACTION_CAMERA_RIGHT;
+    /* Keyboard independent look axis: J/L rotate, I/K raise/lower. */
+    int cam_left=keys[SDL_SCANCODE_J]!=0;
+    int cam_right=keys[SDL_SCANCODE_L]!=0;
+    int cam_up=keys[SDL_SCANCODE_I]!=0;
+    int cam_down=keys[SDL_SCANCODE_K]!=0;
+    if(cam_left || cam_right)
+        out->look_x=(int16_t)((cam_right-cam_left)*32767);
+    if(cam_up || cam_down)
+        out->look_y=(int16_t)((cam_up-cam_down)*32767);
 }
 
 int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)

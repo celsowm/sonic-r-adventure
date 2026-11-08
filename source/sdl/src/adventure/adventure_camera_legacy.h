@@ -8,4 +8,8 @@ bool AdventureCameraLegacy_Trace(void *context, AdventureVec3 target,
                                   AdventureVec3 eye,int32_t collision_layer,
                                   uint16_t *fraction);
 void AdventureCameraLegacy_Apply(const AdventureCamera *camera);
+/* Scoped dynamic FOV; restore global projection scales after drawing. */
+void AdventureCameraLegacy_BeginProjection(const AdventureCamera *camera,
+                                           int *saved_x,int *saved_y);
+void AdventureCameraLegacy_EndProjection(int saved_x,int saved_y);
 #endif

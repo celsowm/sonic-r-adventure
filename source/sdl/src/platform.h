@@ -56,6 +56,10 @@ int platform_poll_events(unsigned char *keystateOut, int keystateSize);
 #define DIK_D           0x20
 #define DIK_E           0x12
 #define DIK_F           0x21
+#define DIK_I           0x17
+#define DIK_J           0x24
+#define DIK_K           0x25
+#define DIK_L           0x26
 #define DIK_Q           0x10
 #define DIK_R           0x13
 #define DIK_S           0x1F

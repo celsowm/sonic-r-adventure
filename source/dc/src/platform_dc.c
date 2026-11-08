@@ -709,6 +709,10 @@ void platform_adventure_read_input(struct AdventureRawInput *out)
                 out->buttons |= ADV_ACTION_CAMERA_LEFT;
             if (cs->rtrig > DC_TRIGGER_THRESH)
                 out->buttons |= ADV_ACTION_CAMERA_RIGHT;
+            /* Original Dreamcast controller has no right stick. X/Y provide
+             * vertical pitch while the triggers keep horizontal orbit. */
+            if (cs->buttons & CONT_Y) out->look_y=32767;
+            if (cs->buttons & CONT_X) out->look_y=-32767;
         }
     }
     int left = !!(s_keystate[DIK_A] & 0x80) || !!(s_keystate[DIK_LEFT] & 0x80);
@@ -723,6 +727,14 @@ void platform_adventure_read_input(struct AdventureRawInput *out)
     if (s_keystate[DIK_LCONTROL] & 0x80) out->buttons |= ADV_ACTION_ROLL;
     if (s_keystate[DIK_Q] & 0x80) out->buttons |= ADV_ACTION_CAMERA_LEFT;
     if (s_keystate[DIK_E] & 0x80) out->buttons |= ADV_ACTION_CAMERA_RIGHT;
+    int cam_left=!!(s_keystate[DIK_J] & 0x80);
+    int cam_right=!!(s_keystate[DIK_L] & 0x80);
+    int cam_up=!!(s_keystate[DIK_I] & 0x80);
+    int cam_down=!!(s_keystate[DIK_K] & 0x80);
+    if(cam_left || cam_right)
+        out->look_x=(int16_t)((cam_right-cam_left)*32767);
+    if(cam_up || cam_down)
+        out->look_y=(int16_t)((cam_up-cam_down)*32767);
 }
 
 int platform_poll_gamepads(unsigned short *joySlotState, int maxSlots)

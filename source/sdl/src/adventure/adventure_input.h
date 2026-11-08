@@ -11,6 +11,8 @@ enum AdventureActionBits {
 typedef struct AdventureRawInput {
     int16_t move_x; /* negative=left, positive=right; range -32768..32767 */
     int16_t move_y; /* positive=forward (SDL/DC analog -Y mapped positive) */
+    int16_t look_x; /* camera stick: positive=orbit right */
+    int16_t look_y; /* camera stick: positive=raise viewpoint */
     uint32_t buttons;
 } AdventureRawInput;
 typedef struct AdventureInput {

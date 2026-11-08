@@ -18,6 +18,12 @@
 #define CAM_RECOVER_STEP (ADV_FP_ONE/3)
 #define CAM_TELEPORT_DISTANCE (100*ADV_FP_ONE)
 #define CAM_LOOKAHEAD_LIMIT (4*ADV_FP_ONE)
+#define CAM_VERTICAL_LOOKAHEAD (2*ADV_FP_ONE)
+#define CAM_STICK_DEADZONE 6000
+#define CAM_STICK_YAW_DIV 1024
+#define CAM_STICK_PITCH_DIV 1300
+#define CAM_FOV_SPEED_LIMIT (5*ADV_FP_ONE)
+#define CAM_FOV_STEP 64
 
 static const uint16_t s_quarter_sin[33] = {0, 201, 401, 601, 799, 995, 1189, 1380, 1567, 1751, 1931, 2106, 2276, 2440, 2598, 2751, 2896, 3035, 3166, 3290, 3406, 3513, 3612, 3703, 3784, 3857, 3920, 3973, 4017, 4052, 4076, 4091, 4096};
 static int32_t sin_q12(uint16_t angle)
@@ -43,13 +49,16 @@ static int32_t approach(int32_t value,int32_t goal,int32_t divisor)
     return AdventureMath_ClampI32((int64_t)value+step);
 }
 static AdventureVec3 desired_eye(AdventureVec3 target,
-                                 uint16_t yaw,int32_t distance)
+                                 uint16_t yaw,int16_t pitch,
+                                 int32_t distance)
 {
+    int32_t elevation=AdventureMath_ClampI32(
+        (int64_t)ADV_CAMERA_HEIGHT+(int64_t)pitch*ADV_FP_ONE/64);
     AdventureVec3 point={
         AdventureMath_ClampI32((int64_t)target.x-
                                (int64_t)cos_q12(yaw)*distance/ADV_FP_ONE),
         AdventureMath_ClampI32((int64_t)target.y+
-                               (int64_t)ADV_CAMERA_HEIGHT*distance/
+                               (int64_t)elevation*distance/
                                ADV_CAMERA_DISTANCE),
         AdventureMath_ClampI32((int64_t)target.z-
                                (int64_t)sin_q12(yaw)*distance/ADV_FP_ONE)
@@ -66,9 +75,13 @@ static AdventureVec3 look_target(const AdventurePlayer *player)
     if(lead_x< -CAM_LOOKAHEAD_LIMIT) lead_x=-CAM_LOOKAHEAD_LIMIT;
     if(lead_z>CAM_LOOKAHEAD_LIMIT) lead_z=CAM_LOOKAHEAD_LIMIT;
     if(lead_z< -CAM_LOOKAHEAD_LIMIT) lead_z=-CAM_LOOKAHEAD_LIMIT;
+    int32_t lead_y=AdventureMath_ClampI32((int64_t)player->velocity.y);
+    if(lead_y>CAM_VERTICAL_LOOKAHEAD) lead_y=CAM_VERTICAL_LOOKAHEAD;
+    if(lead_y< -CAM_VERTICAL_LOOKAHEAD) lead_y=-CAM_VERTICAL_LOOKAHEAD;
     AdventureVec3 target={
         AdventureMath_ClampI32((int64_t)player->pos.x+lead_x),
-        AdventureMath_ClampI32((int64_t)player->pos.y+ADV_CAMERA_LOOK_HEIGHT),
+        AdventureMath_ClampI32((int64_t)player->pos.y+
+                               ADV_CAMERA_LOOK_HEIGHT+lead_y),
         AdventureMath_ClampI32((int64_t)player->pos.z+lead_z)
     };
     return target;
@@ -79,9 +92,12 @@ void AdventureCamera_Reset(AdventureCamera *cam,
     if(!cam || !player) return;
     cam->yaw=player->facing&4095u;
     cam->orbit_offset=0;
+    cam->pitch_offset=0;
+    cam->zoom_q12=ADV_FP_ONE;
     cam->distance=ADV_CAMERA_DISTANCE;
     cam->look_at=look_target(player);
-    cam->position=desired_eye(cam->look_at,cam->yaw,cam->distance);
+    cam->position=desired_eye(cam->look_at,cam->yaw,
+                              cam->pitch_offset,cam->distance);
     cam->initialized=1;
 }
 AdventureBasis AdventureCamera_MovementBasis(const AdventureCamera *camera)
@@ -104,22 +120,40 @@ static void clamp_obstruction(AdventureVec3 from,AdventureVec3 *eye,
 }
 void AdventureCamera_Tick(AdventureCamera *cam,
                            const AdventurePlayer *player,
-                           uint32_t buttons,
+                           AdventureRawInput controls,
                            AdventureCameraTrace trace,void *context)
 {
     if(!cam || !player) return;
     if(!cam->initialized) AdventureCamera_Reset(cam,player);
-    bool left=(buttons&ADV_ACTION_CAMERA_LEFT)!=0;
-    bool right=(buttons&ADV_ACTION_CAMERA_RIGHT)!=0;
-    if(left!=right) {
-        int32_t offset=(int32_t)cam->orbit_offset+
-                       (left?-CAM_ORBIT_RATE:CAM_ORBIT_RATE);
+    /* Right-stick rotation has priority over shoulder/Q/E buttons. Raw
+     * signed range matches SDL and the Maple controls' keyboard fallback. */
+    int32_t yaw_input=(controls.look_x>CAM_STICK_DEADZONE ||
+                       controls.look_x< -CAM_STICK_DEADZONE)?
+                       controls.look_x/CAM_STICK_YAW_DIV:0;
+    bool left=(controls.buttons&ADV_ACTION_CAMERA_LEFT)!=0;
+    bool right=(controls.buttons&ADV_ACTION_CAMERA_RIGHT)!=0;
+    if(!yaw_input && left!=right)
+        yaw_input=left?-CAM_ORBIT_RATE:CAM_ORBIT_RATE;
+    if(yaw_input) {
+        int32_t offset=(int32_t)cam->orbit_offset+yaw_input;
         if(offset>CAM_ORBIT_MAX) offset=CAM_ORBIT_MAX;
         if(offset< -CAM_ORBIT_MAX) offset=-CAM_ORBIT_MAX;
         cam->orbit_offset=(int16_t)offset;
     }else{
         cam->orbit_offset=(int16_t)AdventureMath_Approach(
             cam->orbit_offset,0,CAM_RECENTER);
+    }
+
+    /* Manual vertical look persists until adjusted again, rather than
+     * snapping back whenever the right stick returns to the dead zone. */
+    int32_t pitch_step=(controls.look_y>CAM_STICK_DEADZONE ||
+                        controls.look_y< -CAM_STICK_DEADZONE)?
+                        controls.look_y/CAM_STICK_PITCH_DIV:0;
+    if(pitch_step) {
+        int32_t pitch=(int32_t)cam->pitch_offset+pitch_step;
+        if(pitch>ADV_CAMERA_PITCH_LIMIT) pitch=ADV_CAMERA_PITCH_LIMIT;
+        if(pitch< -ADV_CAMERA_PITCH_LIMIT) pitch=-ADV_CAMERA_PITCH_LIMIT;
+        cam->pitch_offset=(int16_t)pitch;
     }
 
     uint16_t target_yaw=(uint16_t)((player->facing+
@@ -147,8 +181,21 @@ void AdventureCamera_Tick(AdventureCamera *cam,
     cam->look_at.y=approach(cam->look_at.y,goal.y,CAM_VERTICAL_DIV);
     cam->look_at.z=approach(cam->look_at.z,goal.z,CAM_FOLLOW_DIV);
 
+    /* Narrow-to-wide projection smoothly follows actual horizontal speed;
+     * avoid runtime floating point or readback of the legacy renderer. */
+    int64_t vx=player->velocity.x,vz=player->velocity.z;
+    uint32_t speed=AdventureMath_IsqrtU64(
+        (uint64_t)(vx*vx)+(uint64_t)(vz*vz));
+    if(speed>CAM_FOV_SPEED_LIMIT) speed=CAM_FOV_SPEED_LIMIT;
+    int32_t zoom_goal=AdventureMath_ClampI32(
+        (int64_t)ADV_FP_ONE-
+        (int64_t)(ADV_FP_ONE-ADV_CAMERA_ZOOM_MIN)*speed/
+        CAM_FOV_SPEED_LIMIT);
+    cam->zoom_q12=AdventureMath_Approach(
+        cam->zoom_q12,zoom_goal,CAM_FOV_STEP);
+
     AdventureVec3 far=desired_eye(cam->look_at,cam->yaw,
-                                  ADV_CAMERA_DISTANCE);
+                                  cam->pitch_offset,ADV_CAMERA_DISTANCE);
     uint16_t fraction=0;
     int32_t allowed=ADV_CAMERA_DISTANCE;
     bool blocked=trace && trace(context,cam->look_at,far,
@@ -169,7 +216,8 @@ void AdventureCamera_Tick(AdventureCamera *cam,
         cam->distance=ADV_CAMERA_DISTANCE;
     if(cam->distance<ADV_CAMERA_MIN_DISTANCE)
         cam->distance=ADV_CAMERA_MIN_DISTANCE;
-    AdventureVec3 desired=desired_eye(cam->look_at,cam->yaw,cam->distance);
+    AdventureVec3 desired=desired_eye(cam->look_at,cam->yaw,
+                                       cam->pitch_offset,cam->distance);
     if(blocked) cam->position=desired; /* promptly move inside near walls */
     else {
         cam->position.x=approach(cam->position.x,desired.x,CAM_FOLLOW_DIV);
