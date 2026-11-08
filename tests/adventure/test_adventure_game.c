@@ -837,7 +837,7 @@ static void test_roof_in_vertical_gameplay(void)
     AdventureRoof_Clear(&mesh);
     AdventureRoofTriangle r=roof(8*ADV_FP_ONE,23);
     assert(AdventureRoof_Add(&mesh,r));
-    AdventureTerrain terrain={test_world_ground,&mesh,0,0,AdventureRoof_SweepMesh};
+    AdventureTerrain terrain={test_world_ground,&mesh,0,0,AdventureCapsule_SweepMesh};
     AdventureGame game;
     AdventureGame_Init(&game);
     AdventureGame_SetTerrain(&game,terrain);
