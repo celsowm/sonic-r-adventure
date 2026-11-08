@@ -1,21 +1,44 @@
-name: Adventure lifecycle tests
+name: Adventure gameplay and desktop build
 
 on:
   push:
     paths:
       - "source/sdl/src/adventure/**"
+      - "source/sdl/src/platform.h"
+      - "source/sdl/src/platform/platform_sdl.c"
+      - "source/sdl/src/main.c"
+      - "source/sdl/src/hud_full.c"
+      - "source/sdl/Makefile"
+      - "source/dc/src/platform_dc.c"
       - "tests/adventure/**"
       - ".github/workflows/adventure-tests.yml"
   pull_request:
     paths:
       - "source/sdl/src/adventure/**"
+      - "source/sdl/src/platform.h"
+      - "source/sdl/src/platform/platform_sdl.c"
+      - "source/sdl/src/main.c"
+      - "source/sdl/src/hud_full.c"
+      - "source/sdl/Makefile"
+      - "source/dc/src/platform_dc.c"
       - "tests/adventure/**"
       - ".github/workflows/adventure-tests.yml"
 
 jobs:
-  lifecycle:
+  gameplay:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compile and run platform-neutral adventure tests
+      - name: Compile and run portable adventure gameplay tests
         run: make -C tests/adventure test
+
+  desktop-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL/OpenGL build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev libsdl2-mixer-dev libgl1-mesa-dev libminiupnpc-dev pkg-config
+      - name: Build complete Sonic R SDL application
+        run: make -C source/sdl -j2
