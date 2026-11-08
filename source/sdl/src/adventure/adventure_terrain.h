@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "adventure_collision.h"
+#include "adventure_roof.h"
 typedef struct AdventureGroundHit {
     int32_t height;        /* top surface Y, Q20.12 */
     int32_t surface_id;
@@ -23,5 +24,9 @@ typedef struct AdventureTerrain {
     void *context;
     AdventureWallQuery sweep_wall; /* optional static-wall collision */
     AdventureOverheadQuery query_overhead; /* optional nearest floor above head */
+    /* Optional continuous HEAD-POINT collision with explicitly authored BIN
+     * roof faces. The same terrain.context is passed to this callback. */
+    bool (*sweep_roof)(void *context, AdventureVec3 head_from,
+                       AdventureVec3 head_to, AdventureRoofHit *hit);
 } AdventureTerrain;
 #endif

@@ -186,7 +186,7 @@ static void test_world_spawn_and_ramp(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, spawn, 0);
@@ -205,7 +205,7 @@ static void test_jump_and_landing(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, spawn, 0);
@@ -235,7 +235,7 @@ static void test_stacked_floor_and_ledge(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 lower = {35 * ADV_FP_ONE, 0, 0};
     AdventureGame_SetSpawn(&game, lower, 0);
@@ -264,7 +264,7 @@ static void test_world_replay(void)
     AdventureGame a, b;
     AdventureGame_Init(&a);
     AdventureGame_Init(&b);
-    AdventureTerrain terrain = {test_world_ground, 0, 0, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, 0, 0, 0};
     AdventureGame_SetTerrain(&a, terrain);
     AdventureGame_SetTerrain(&b, terrain);
     AdventureVec3 start = {5 * ADV_FP_ONE, 0, 0};
@@ -401,7 +401,7 @@ static void test_wall_gameplay(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {test_world_ground, 0, test_wall_x, 0};
+    AdventureTerrain terrain = {test_world_ground, 0, test_wall_x, 0, 0};
     AdventureGame_SetTerrain(&game, terrain);
     AdventureVec3 spawn = {5*ADV_FP_ONE,0,0};
     AdventureGame_SetSpawn(&game,spawn,0);
@@ -482,7 +482,7 @@ static void test_jump_head_hits_underside(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain={stack_ground,0,0,stack_overhead};
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0};
     AdventureGame_SetTerrain(&game,terrain);
     AdventureVec3 spawn={5*ADV_FP_ONE,0,0};
     AdventureGame_SetSpawn(&game,spawn,0);
@@ -518,7 +518,7 @@ static void test_jump_from_upper_platform(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain={stack_ground,0,0,stack_overhead};
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0};
     AdventureGame_SetTerrain(&game,terrain);
     AdventureVec3 spawn={5*ADV_FP_ONE,20*ADV_FP_ONE,0};
     AdventureGame_SetSpawn(&game,spawn,0);
@@ -543,7 +543,7 @@ static void test_unobstructed_jump_still_works(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain={test_world_ground,0,0,stack_overhead};
+    AdventureTerrain terrain={test_world_ground,0,0,stack_overhead,0};
     AdventureGame_SetTerrain(&game,terrain);
     /* Beyond x=40: no overhead. The ground fixture continues to 45. */
     AdventureVec3 spawn={42*ADV_FP_ONE,0,0};
@@ -561,7 +561,7 @@ static void test_head_bonk_determinism(void)
 {
     AdventureGame a,b;
     AdventureGame_Init(&a); AdventureGame_Init(&b);
-    AdventureTerrain terrain={stack_ground,0,0,stack_overhead};
+    AdventureTerrain terrain={stack_ground,0,0,stack_overhead,0};
     AdventureGame_SetTerrain(&a,terrain);
     AdventureGame_SetTerrain(&b,terrain);
     AdventureVec3 spawn={5*ADV_FP_ONE,0,0};
@@ -607,7 +607,7 @@ static bool thin_roof(void *ctx,int32_t x,int32_t z,int32_t lim,
 }
 static void test_diagonal_terrain_sweeps(void)
 {
-    AdventureTerrain t={thin_ground,0,0,thin_roof};
+    AdventureTerrain t={thin_ground,0,0,thin_roof,0};
     AdventureVerticalContact c;
     AdventureVec3 from={0,14*ADV_FP_ONE,ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,4*ADV_FP_ONE,ADV_FP_ONE};
@@ -632,7 +632,7 @@ static void test_diagonal_terrain_sweeps(void)
 }
 static void test_diagonal_sweep_no_false_contact(void)
 {
-    AdventureTerrain t={thin_ground,0,0,thin_roof};
+    AdventureTerrain t={thin_ground,0,0,thin_roof,0};
     AdventureVerticalContact c;
     AdventureVec3 from={0,14*ADV_FP_ONE,-2*ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,4*ADV_FP_ONE,-2*ADV_FP_ONE};
@@ -649,7 +649,7 @@ static void test_diagonal_sweep_no_false_contact(void)
 }
 static void test_diagonal_sweep_replay(void)
 {
-    AdventureTerrain t={thin_ground,0,0,thin_roof};
+    AdventureTerrain t={thin_ground,0,0,thin_roof,0};
     AdventureVerticalContact a,b;
     AdventureVec3 from={0,10*ADV_FP_ONE,ADV_FP_ONE};
     AdventureVec3 to={10*ADV_FP_ONE,30*ADV_FP_ONE,ADV_FP_ONE};
@@ -706,7 +706,7 @@ static void test_game_tick_hits_narrow_roof(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain={roof_strip_ground,0,0,roof_strip_overhead};
+    AdventureTerrain terrain={roof_strip_ground,0,0,roof_strip_overhead,0};
     AdventureGame_SetTerrain(&game,terrain);
     AdventureVec3 spawn={4*ADV_FP_ONE+ADV_FP_ONE/2,
                          15*ADV_FP_ONE,0};
@@ -723,6 +723,117 @@ static void test_game_tick_hits_narrow_roof(void)
     assert(game.player.velocity.y==0);
     assert(!game.player.grounded);
 }
+
+/* The renderer exposes no reliable solid-roof bit. These synthetic faces
+ * prove that ONLY authored triangles participate in swept head collision. */
+static AdventureRoofTriangle roof(int32_t y,int32_t id)
+{
+    AdventureRoofTriangle t={
+        {0,y,0},{10*ADV_FP_ONE,y,0},{0,y,10*ADV_FP_ONE},id
+    };
+    return t;
+}
+static void test_analytic_roof_sweep(void)
+{
+    AdventureRoofTriangle t=roof(20*ADV_FP_ONE,71);
+    AdventureVec3 from={2*ADV_FP_ONE,10*ADV_FP_ONE,2*ADV_FP_ONE};
+    AdventureVec3 to={2*ADV_FP_ONE,30*ADV_FP_ONE,2*ADV_FP_ONE};
+    AdventureRoofHit hit;
+    assert(AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(hit.fraction==ADV_FP_ONE/2);
+    assert(hit.triangle_id==71);
+    /* Winding must not change physical solidity of an explicitly picked roof. */
+    AdventureVec3 swap=t.b; t.b=t.c; t.c=swap;
+    assert(AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(hit.fraction==ADV_FP_ONE/2);
+    from.y=22*ADV_FP_ONE;
+    assert(!AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    from.y=10*ADV_FP_ONE;
+    from.x=9*ADV_FP_ONE;from.z=9*ADV_FP_ONE;
+    to.x=from.x;to.z=from.z;
+    assert(!AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    to.y=from.y;
+    assert(!AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    /* The true time-of-impact does not depend on velocity substep count. */
+    from.x=2*ADV_FP_ONE;from.z=2*ADV_FP_ONE;
+    to.x=from.x;to.z=from.z;
+    from.y=20*ADV_FP_ONE;to.y=21*ADV_FP_ONE;
+    assert(AdventureRoof_SweepTriangle(from,to,&t,&hit));
+    assert(hit.fraction==0u);
+}
+static void test_roof_mesh_opt_in_and_priority(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    AdventureRoofHit hit;
+    AdventureVec3 from={2*ADV_FP_ONE,10*ADV_FP_ONE,2*ADV_FP_ONE};
+    AdventureVec3 to={2*ADV_FP_ONE,30*ADV_FP_ONE,2*ADV_FP_ONE};
+    assert(!AdventureRoof_SweepMesh(&mesh,from,to,&hit));
+    AdventureRoofTriangle a=roof(22*ADV_FP_ONE,22);
+    AdventureRoofTriangle b=roof(15*ADV_FP_ONE,15);
+    assert(AdventureRoof_Add(&mesh,a));
+    assert(AdventureRoof_Add(&mesh,b));
+    assert(mesh.count==2);
+    assert(AdventureRoof_SweepMesh(&mesh,from,to,&hit));
+    assert(hit.triangle_id==15);
+    assert(hit.fraction==ADV_FP_ONE/4);
+    /* Explicitly reject vertical, degenerate or unbounded additions. */
+    AdventureRoofTriangle vertical={
+        {0,0,0},{0,10*ADV_FP_ONE,0},{0,0,10*ADV_FP_ONE},50
+    };
+    assert(!AdventureRoof_Add(&mesh,vertical));
+    vertical.b=vertical.a;
+    assert(!AdventureRoof_Add(&mesh,vertical));
+    assert(mesh.count==2);
+}
+static void test_sloped_roof_and_diagonal_face(void)
+{
+    AdventureRoofTriangle sloped={
+        {3*ADV_FP_ONE,20*ADV_FP_ONE,0},
+        {8*ADV_FP_ONE,24*ADV_FP_ONE,0},
+        {3*ADV_FP_ONE,20*ADV_FP_ONE,8*ADV_FP_ONE},45
+    };
+    AdventureVec3 from={0,10*ADV_FP_ONE,2*ADV_FP_ONE};
+    AdventureVec3 to={10*ADV_FP_ONE,35*ADV_FP_ONE,2*ADV_FP_ONE};
+    AdventureRoofHit hit;
+    assert(AdventureRoof_SweepTriangle(from,to,&sloped,&hit));
+    assert(hit.fraction>ADV_FP_ONE/3);
+    assert(hit.fraction<3*ADV_FP_ONE/4);
+    assert(hit.triangle_id==45);
+    /* Point only intersects the finite roof face mid-path, not at either end. */
+    from.z=-5*ADV_FP_ONE;to.z=-5*ADV_FP_ONE;
+    assert(!AdventureRoof_SweepTriangle(from,to,&sloped,&hit));
+}
+static void test_roof_in_vertical_gameplay(void)
+{
+    AdventureRoofMesh mesh;
+    AdventureRoof_Clear(&mesh);
+    AdventureRoofTriangle r=roof(8*ADV_FP_ONE,23);
+    assert(AdventureRoof_Add(&mesh,r));
+    AdventureTerrain terrain={test_world_ground,&mesh,0,0,AdventureRoof_SweepMesh};
+    AdventureGame game;
+    AdventureGame_Init(&game);
+    AdventureGame_SetTerrain(&game,terrain);
+    AdventureVec3 spawn={5*ADV_FP_ONE,0,0};
+    AdventureGame_SetSpawn(&game,spawn,0);
+    assert(game.player.grounded);
+    AdventureRawInput raw={0};
+    raw.buttons=ADV_ACTION_JUMP;
+    assert(AdventureGame_Tick(&game,raw,kEast));
+    assert(!game.player.grounded);
+    assert(game.player.velocity.y==0);
+    assert(game.player.pos.y>=3*ADV_FP_ONE);
+    assert(game.player.pos.y<=4*ADV_FP_ONE);
+    /* Head impact should fall back to the original TER ground. */
+    raw.buttons=0;
+    bool landed=false;
+    for(int i=0;i<100;i++){
+        assert(AdventureGame_Tick(&game,raw,kEast));
+        if(game.player.grounded){landed=true;break;}
+    }
+    assert(landed && game.player.pos.y==0);
+}
+
 int main(void)
 {
     test_lifecycle();
@@ -748,5 +859,9 @@ int main(void)
     test_diagonal_sweep_no_false_contact();
     test_diagonal_sweep_replay();
     test_game_tick_hits_narrow_roof();
+    test_analytic_roof_sweep();
+    test_roof_mesh_opt_in_and_priority();
+    test_sloped_roof_and_diagonal_face();
+    test_roof_in_vertical_gameplay();
     return 0;
 }

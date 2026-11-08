@@ -62,6 +62,8 @@ bool AdventureVertical_Sweep(AdventureTerrain terrain,
     if (samples>ADV_VERTICAL_MAX_STEPS)
         samples=ADV_VERTICAL_MAX_STEPS;
     uint32_t previous_t=0;
+    bool found=false;
+    AdventureVerticalContact best={0};
     for(uint32_t i=1;i<=samples;i++){
         uint32_t t=i*ADV_FP_ONE/samples;
         AdventureGroundHit hit;
@@ -82,20 +84,44 @@ bool AdventureVertical_Sweep(AdventureTerrain terrain,
             AdventureGroundHit refined;
             if (crossed(terrain,from,to,capsule_height,rising,hi,&refined))
                 hit=refined;
-            contact->fraction=(uint16_t)hi;
-            contact->surface=hit;
-            contact->position=position_at(from,to,hi);
+            best.fraction=(uint16_t)hi;
+            best.surface=hit;
+            best.position=position_at(from,to,hi);
             if (rising) {
                 int32_t ceiling=AdventureMath_ClampI32(
                     (int64_t)hit.height-capsule_height-ADV_VERTICAL_HEAD_SKIN);
                 /* Starting head contact must not push Sonic downwards. */
-                contact->position.y=ceiling>from.y?ceiling:from.y;
+                best.position.y=ceiling>from.y?ceiling:from.y;
             }else{
-                contact->position.y=hit.height;
+                best.position.y=hit.height;
             }
-            return true;
+            found=true;
+            break;
         }
         previous_t=t;
     }
-    return false;
+    if (rising && terrain.sweep_roof) {
+        AdventureVec3 head_from=from,head_to=to;
+        head_from.y=AdventureMath_ClampI32(
+            (int64_t)from.y+capsule_height);
+        head_to.y=AdventureMath_ClampI32(
+            (int64_t)to.y+capsule_height);
+        AdventureRoofHit roof;
+        if (terrain.sweep_roof(terrain.context,head_from,head_to,&roof) &&
+            (!found || roof.fraction<best.fraction)) {
+            best.fraction=roof.fraction;
+            best.position=position_at(from,to,roof.fraction);
+            /* Roof narrow-phase computed exact plane crossing, unlike the
+             * sampled TER heightfield. Nudge foot down by contact skin. */
+            if (best.position.y>from.y)
+                best.position.y=AdventureMath_ClampI32(
+                    (int64_t)best.position.y-ADV_VERTICAL_HEAD_SKIN);
+            best.surface.height=best.position.y+capsule_height;
+            best.surface.surface_id=-2-roof.triangle_id;
+            best.surface.layer=-1;
+            found=true;
+        }
+    }
+    if (found) *contact=best;
+    return found;
 }

@@ -14,6 +14,8 @@
 #include "adventure_game.h"
 #include "adventure_math.h"
 #include "adventure_terrain_legacy.h"
+#include "adventure_roof.h"
+#include "adventure_roof_legacy.h"
 #include "sonicr_types.h"
 #include "sonicr_globals.h"
 #include "sonicr_functions.h"
@@ -27,6 +29,8 @@ extern void FlipD3D(void);
 extern unsigned char s_keystate[256];
 
 static int s_adventure_active;
+/* A small fixed-capacity registry, allocated once, not per frame/stack. */
+static AdventureRoofMesh s_selected_roofs;
 
 /* One-way bridge into exactly the legacy fields consumed by presentation.
  * Never run UpdatePlayerMovement or the five-player race physics scheduler. */
@@ -58,9 +62,13 @@ int AdventureMode_RunPreview(void)
 {
     AdventureGame game;
     AdventureGame_Init(&game);
-    AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, 0,
+    /* Explicit roof selections are empty until individual visual faces have
+     * been validated as solid. Do not collide all render decoration geometry. */
+    AdventureRoofLegacy_LoadSelected(&s_selected_roofs, g_trackId);
+    AdventureTerrain terrain = {AdventureTerrain_QueryLegacy, &s_selected_roofs,
                                 AdventureTerrain_SweepLegacyWall,
-                                AdventureTerrain_QueryLegacyOverhead};
+                                AdventureTerrain_QueryLegacyOverhead,
+                                AdventureRoof_SweepMesh};
     AdventureGame_SetTerrain(&game, terrain);
 
     /* InitLevel already populated the original game resources and Player[0].
