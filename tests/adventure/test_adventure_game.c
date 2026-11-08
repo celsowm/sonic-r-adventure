@@ -950,8 +950,11 @@ static void test_roof_sphere_game_tick_graze(void)
     assert(AdventureGame_Tick(&game,raw,kEast));
     assert(!game.player.grounded);
     assert(game.player.velocity.y==0);
-    assert(game.player.pos.y>=3*ADV_FP_ONE &&
-           game.player.pos.y<4*ADV_FP_ONE);
+    /* Edge z=-0.5 intersects the unit head sphere at head-center
+     * Y=8-sqrt(1-0.5^2) ~= 7.134, hence footY ~= 4.134 minus skin.
+     * This is later/higher than direct center-plane contact at footY=4. */
+    assert(game.player.pos.y>4*ADV_FP_ONE &&
+           game.player.pos.y<5*ADV_FP_ONE);
 }
 
 int main(void)
